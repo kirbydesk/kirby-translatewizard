@@ -128,7 +128,13 @@ Kirby::plugin('kirbydesk/translatewizard', [
                             // Copy every content field from the default
                             // language onto the current language.
                             $defaultContent = $model->content($source)->toArray();
-                            $model->update($defaultContent, $target);
+                            $model = $model->update($defaultContent, $target);
+
+                            // Drop the translated slug — a slug equal to
+                            // the folder name is removed from the text file.
+                            if ($model instanceof \Kirby\Cms\Page && !$model->isHomeOrErrorPage()) {
+                                $model->changeSlug($model->uid(), $target);
+                            }
 
                             return [
                                 'event'   => 'model.update',

@@ -7,13 +7,20 @@ config untouched. Walks Blocks recursively so nested items
 (`pwsteplistitem`, `pwcardletsitem`, `pwfeaturelistitem`, `pwButton`, …)
 are translated too.
 
+Besides the Blocks field, the page title and pagewizard's meta fields
+(`metapagetitle`, `metanavigationtitle`, `metateaser`,
+`metadescription`, `metakeywords`) are translated as well. Pages get a
+target-language slug derived from the translated title (home and error
+page keep theirs; on a slug collision the current slug is kept).
+
 Adds an **AI** button to page views in every secondary language with
 two actions:
 
 - **Translate page with AI** — sends the default-language content through DeepL
   and writes the result to the current secondary language.
 - **Restore original language** — copies the default-language content
-  onto the current language 1:1 (destructive).
+  onto the current language 1:1 and drops the translated slug
+  (destructive). Disabled until the language's content file exists.
 
 ## Requirements
 
