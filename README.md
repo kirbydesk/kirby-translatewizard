@@ -80,7 +80,7 @@ return [
     'panel' => [
         'viewButtons' => [
             'page' => ['open', 'preview', '-', 'settings', 'ai', 'languages', 'status'],
-            'site' => ['preview', '-', 'settings', 'ai', 'languages'],
+            'site' => ['preview', '-', 'ai', 'languages'],
         ],
     ],
 ];
