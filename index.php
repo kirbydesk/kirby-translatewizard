@@ -28,70 +28,42 @@ function _translatewizard_apiKey(App $kirby): ?string
 Kirby::plugin('kirbydesk/translatewizard', [
     'options' => [
         'deepl.apiKey' => null,
-        // Note on wiring:
-        // • The view-button `translatewizard` is registered below via
-        //   `areas.site.buttons` and will render on any page whose
-        //   blueprint has no explicit `buttons:` — provided the project
-        //   registers it in Kirby's `panel.viewButtons.page` config.
-        //   Plugin options are nested under the plugin prefix by Kirby,
-        //   so this cannot ship as a default here; add it to your
-        //   `site/config/config.php`:
-        //
-        //     'panel' => [
-        //         'viewButtons' => [
-        //             'page' => ['open', 'preview', '-', 'settings',
-        //                        'translatewizard', 'languages', 'status'],
-        //         ],
-        //     ],
-        //
-        // • Blueprints that DO declare `buttons:` must add
-        //   `- translatewizard` themselves — blueprint wins over config.
+
+        // Entries for pagewizard's shared "AI" view button. Translating
+        // only makes sense in a secondary language.
+        'aiActions' => function ($model): array {
+            $kirby   = App::instance();
+            $default = $kirby->defaultLanguage();
+            $current = $kirby->language();
+
+            if ($default === null || $current === null) return [];
+            if ($current->code() === $default->code()) return [];
+
+            $path = $model->panel()?->path() ?? '';
+
+            // Restore only makes sense once the language's
+            // content file (e.g. *.en.txt) exists.
+            $hasTranslation = $model->version('latest')->exists($current);
+
+            return [
+                [
+                    'label'  => t('translatewizard.action.translate', 'Translate page with AI'),
+                    'icon'   => 'translatewizard-sparkles',
+                    'dialog' => 'translatewizard/' . $path,
+                ],
+                [
+                    'label'    => t('translatewizard.action.restore', 'Restore original language'),
+                    'icon'     => 'refresh',
+                    'dialog'   => 'translatewizard/reset/' . $path,
+                    'disabled' => $hasTranslation === false,
+                ],
+            ];
+        },
     ],
 
     'areas' => [
         'site' => function () {
             return [
-                'buttons' => [
-                    'translatewizard' => function ($model = null) {
-                        $kirby   = App::instance();
-                        $default = $kirby->defaultLanguage();
-                        $current = $kirby->language();
-
-                        // Hide in the default language — nothing to
-                        // translate from oneself.
-                        if ($default === null || $current === null) return null;
-                        if ($current->code() === $default->code()) return null;
-                        if ($model === null) return null;
-
-                        $path = $model->panel()?->path() ?? '';
-
-                        // Restore only makes sense once the language's
-                        // content file (e.g. *.en.txt) exists.
-                        $hasTranslation = $model->version('latest')->exists($current);
-
-                        // Kirby's k-view-button treats `options` as an
-                        // exclusive dropdown trigger (dialog is ignored
-                        // once options is set). We use that: the button
-                        // opens a small menu with two actions.
-                        return [
-                            'icon'    => 'ai',
-                            'title'   => t('translatewizard.button.text', 'AI'),
-                            'options' => [
-                                [
-                                    'label'  => t('translatewizard.action.translate', 'Translate page with AI'),
-                                    'icon'   => 'translatewizard-sparkles',
-                                    'dialog' => 'translatewizard/' . $path,
-                                ],
-                                [
-                                    'label'  => t('translatewizard.action.restore', 'Restore'),
-                                    'icon'     => 'refresh',
-                                    'dialog'   => 'translatewizard/reset/' . $path,
-                                    'disabled' => $hasTranslation === false,
-                                ],
-                            ],
-                        ];
-                    }
-                ],
                 'dialogs' => [
                     'translatewizard/reset/(:all)' => [
                         'load' => function (string $path) {

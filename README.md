@@ -66,19 +66,21 @@ allows up to 500,000 characters per month.
 
 ### Panel button
 
-The **AI** view button is registered globally as `translatewizard`. It
-only appears in secondary languages (Kirby's default language cannot
-translate to itself).
+The actions live in the shared **AI** view button provided by
+kirby-pagewizard (`ai`, requires kirby-pagewizard 1.1.51+). The button
+only shows entries that make sense for the current view: the translate
+actions appear in secondary languages only (Kirby's default language
+cannot translate to itself). When kirby-contentwizard is installed too,
+its entries are added below a separator.
 
-To pick it up automatically on every page and site view, add it to
-Kirby's `panel.viewButtons` config:
+Add the button to Kirby's `panel.viewButtons` config:
 
 ```php
 return [
     'panel' => [
         'viewButtons' => [
-            'page' => ['open', 'preview', '-', 'settings', 'translatewizard', 'languages', 'status'],
-            'site' => ['preview', '-', 'settings', 'translatewizard', 'languages'],
+            'page' => ['open', 'preview', '-', 'settings', 'ai', 'languages', 'status'],
+            'site' => ['preview', '-', 'settings', 'ai', 'languages'],
         ],
     ],
 ];
@@ -86,8 +88,8 @@ return [
 
 This config only applies to blueprints that do **not** declare their
 own `buttons:`. If a page blueprint declares its own list, add
-`- translatewizard` to it explicitly — Kirby always prefers the
-blueprint list over the config default.
+`- ai` to it explicitly — Kirby always prefers the blueprint list over
+the config default.
 
 ## API
 

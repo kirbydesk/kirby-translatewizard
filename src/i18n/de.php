@@ -1,6 +1,5 @@
 <?php return [
 
-	'translatewizard.button.text'    => 'KI Übersetzung',
 	'translatewizard.action.translate' => 'Seite mit KI übersetzen',
 	'translatewizard.action.restore' => 'Originalsprache wiederherstellen',
 	'translatewizard.dialog.submit'  => 'Übersetzen',
