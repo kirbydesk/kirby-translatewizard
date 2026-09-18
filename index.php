@@ -74,7 +74,7 @@ Kirby::plugin('kirbydesk/translatewizard', [
                             'title'   => t('translatewizard.button.text', 'AI'),
                             'options' => [
                                 [
-                                    'label'  => t('translatewizard.action.translate', 'Translate'),
+                                    'label'  => t('translatewizard.action.translate', 'Translate page with AI'),
                                     'icon'   => 'translatewizard-sparkles',
                                     'dialog' => 'translatewizard/' . $path,
                                 ],
@@ -187,7 +187,7 @@ Kirby::plugin('kirbydesk/translatewizard', [
     'translations' => [
         'en' => [
             'translatewizard.button.text'    => 'AI Translation',
-            'translatewizard.action.translate' => 'Translate page',
+            'translatewizard.action.translate' => 'Translate page with AI',
             'translatewizard.action.restore' => 'Restore original language',
             'translatewizard.dialog.submit'  => 'Translate',
             'translatewizard.dialog.confirm' => 'Translate this page into {lang}?',
@@ -199,7 +199,7 @@ Kirby::plugin('kirbydesk/translatewizard', [
         ],
         'de' => [
             'translatewizard.button.text'    => 'AI Translation',
-            'translatewizard.action.translate' => 'Seite übersetzen',
+            'translatewizard.action.translate' => 'Seite mit KI übersetzen',
             'translatewizard.action.restore' => 'Originalsprache wiederherstellen',
             'translatewizard.dialog.submit'  => 'Übersetzen',
             'translatewizard.dialog.confirm' => 'Soll die Seite in {lang} übersetzt werden?',

@@ -10,7 +10,7 @@ are translated too.
 Adds an **AI** button to page views in every secondary language with
 two actions:
 
-- **Translate page** — sends the default-language content through DeepL
+- **Translate page with AI** — sends the default-language content through DeepL
   and writes the result to the current secondary language.
 - **Restore original language** — copies the default-language content
   onto the current language 1:1 (destructive).
