@@ -9,4 +9,7 @@
 	'translatewizard.reset.done'     => 'Inhalt zurückgesetzt.',
 	'translatewizard.result.done'    => '{units} Feld(er) übersetzt.',
 	'translatewizard.result.nothing' => 'Nichts zu übersetzen.',
+
+	'translatewizard.secret.deepl' => 'DeepL-API-Key',
+	'translatewizard.secret.deepl.help' => 'Für „Seite mit KI übersetzen“. Keys mit der Endung :fx nutzen DeepL Free.',
 ];

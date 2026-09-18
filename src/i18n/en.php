@@ -9,4 +9,7 @@
 	'translatewizard.reset.done'     => 'Content restored.',
 	'translatewizard.result.done'    => '{units} field(s) translated.',
 	'translatewizard.result.nothing' => 'Nothing to translate.',
+
+	'translatewizard.secret.deepl' => 'DeepL API key',
+	'translatewizard.secret.deepl.help' => 'For “Translate page with AI”. Keys ending in :fx use DeepL Free.',
 ];

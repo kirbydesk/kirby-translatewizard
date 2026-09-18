@@ -42,7 +42,10 @@ Or drop this repository into `site/plugins/kirby-translatewizard/`.
 
 ### DeepL API key
 
-Register your DeepL API key in `site/config/config.php`:
+Easiest: enter it in the panel under **Project Wizard → AI → Access
+keys** (admins only). It is stored as `DEEPL_API_KEY` in the project's
+`.env` and never shown again in full. Alternatively set it in
+`site/config/config.php` — the config option takes precedence:
 
 ```php
 return [

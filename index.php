@@ -17,17 +17,30 @@ spl_autoload_register(function (string $class): void {
 });
 
 /**
- * Load API key from config.
+ * DeepL key: plugin option (config.php) first, then the project's .env
+ * (managed in the Project Wizard), then the process environment.
  */
 function _translatewizard_apiKey(App $kirby): ?string
 {
-    $key = $kirby->option('kirbydesk.translatewizard.deepl.apiKey');
+    $key = $kirby->option('kirbydesk.translatewizard.deepl.apiKey')
+        ?: (class_exists('pwSecrets') ? pwSecrets::get('DEEPL_API_KEY') : '')
+        ?: getenv('DEEPL_API_KEY');
     return is_string($key) && $key !== '' ? $key : null;
 }
 
 Kirby::plugin('kirbydesk/translatewizard', [
     'options' => [
         'deepl.apiKey' => null,
+
+        // Key the Project Wizard can manage in the project's .env.
+        'secrets' => fn () => [
+            [
+                'env'    => 'DEEPL_API_KEY',
+                'option' => 'deepl.apiKey',
+                'label'  => t('translatewizard.secret.deepl', 'DeepL API key'),
+                'help'   => t('translatewizard.secret.deepl.help', 'For “Translate page with AI”. Keys ending in :fx use DeepL Free.'),
+            ],
+        ],
 
         // Entries for pagewizard's shared "AI" view button. Translating
         // only makes sense in a secondary language.
