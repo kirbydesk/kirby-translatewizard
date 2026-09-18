@@ -16,12 +16,201 @@ spl_autoload_register(function (string $class): void {
     if (is_file($path)) require $path;
 });
 
+/**
+ * Load API key from config.
+ */
+function _translatewizard_apiKey(App $kirby): ?string
+{
+    $key = $kirby->option('kirbydesk.translatewizard.deepl.apiKey');
+    return is_string($key) && $key !== '' ? $key : null;
+}
+
 Kirby::plugin('kirbydesk/translatewizard', [
     'options' => [
-        // Explicit key wins; otherwise fall back to content-translator's
-        // DeepL config so users don't have to configure it twice.
         'deepl.apiKey' => null,
+        // Note on wiring:
+        // • The view-button `translatewizard` is registered below via
+        //   `areas.site.buttons` and will render on any page whose
+        //   blueprint has no explicit `buttons:` — provided the project
+        //   registers it in Kirby's `panel.viewButtons.page` config.
+        //   Plugin options are nested under the plugin prefix by Kirby,
+        //   so this cannot ship as a default here; add it to your
+        //   `site/config/config.php`:
+        //
+        //     'panel' => [
+        //         'viewButtons' => [
+        //             'page' => ['open', 'preview', '-', 'settings',
+        //                        'translatewizard', 'languages', 'status'],
+        //         ],
+        //     ],
+        //
+        // • Blueprints that DO declare `buttons:` must add
+        //   `- translatewizard` themselves — blueprint wins over config.
     ],
+
+    'areas' => [
+        'site' => function () {
+            return [
+                'buttons' => [
+                    'translatewizard' => function ($model = null) {
+                        $kirby   = App::instance();
+                        $default = $kirby->defaultLanguage();
+                        $current = $kirby->language();
+
+                        // Hide in the default language — nothing to
+                        // translate from oneself.
+                        if ($default === null || $current === null) return null;
+                        if ($current->code() === $default->code()) return null;
+                        if ($model === null) return null;
+
+                        $path = $model->panel()?->path() ?? '';
+
+                        // Kirby's k-view-button treats `options` as an
+                        // exclusive dropdown trigger (dialog is ignored
+                        // once options is set). We use that: the button
+                        // opens a small menu with two actions.
+                        return [
+                            'icon'    => 'ai',
+                            'title'   => t('translatewizard.button.text', 'AI'),
+                            'options' => [
+                                [
+                                    'label'  => t('translatewizard.action.translate', 'Translate'),
+                                    'icon'   => 'translatewizard-sparkles',
+                                    'dialog' => 'translatewizard/' . $path,
+                                ],
+                                [
+                                    'label'  => t('translatewizard.action.restore', 'Restore'),
+                                    'icon'   => 'refresh',
+                                    'dialog' => 'translatewizard/reset/' . $path,
+                                ],
+                            ],
+                        ];
+                    }
+                ],
+                'dialogs' => [
+                    'translatewizard/reset/(:all)' => [
+                        'load' => function (string $path) {
+                            $kirby   = App::instance();
+                            $default = $kirby->defaultLanguage();
+                            return [
+                                'component' => 'k-text-dialog',
+                                'props' => [
+                                    'submitButton' => [
+                                        'text'  => t('translatewizard.reset.submit', 'Restore'),
+                                        'theme' => 'negative',
+                                        'icon'  => 'refresh',
+                                    ],
+                                    'text'  => tt('translatewizard.reset.confirm', 'Restore this language version to the {lang} original? Content in the current language will be overwritten.', [
+                                        'lang' => $default->name(),
+                                    ]),
+                                ],
+                            ];
+                        },
+                        'submit' => function (string $path) {
+                            $kirby = App::instance();
+                            $model = Find::parent($path);
+
+                            if ($model->permissions()->can('update') === false) {
+                                throw new PermissionException(message: 'Not allowed.');
+                            }
+
+                            $source = $kirby->defaultLanguage()->code();
+                            $target = $kirby->language()->code();
+                            if ($source === $target) {
+                                throw new InvalidArgumentException(message: 'Cannot reset the default language onto itself.');
+                            }
+
+                            // Copy every content field from the default
+                            // language onto the current language.
+                            $defaultContent = $model->content($source)->toArray();
+                            $model->update($defaultContent, $target);
+
+                            return [
+                                'event'   => 'model.update',
+                                'message' => t('translatewizard.reset.done', 'Content reset.'),
+                            ];
+                        }
+                    ],
+                    'translatewizard/(:all)' => [
+                        'load' => function (string $path) {
+                            $kirby  = App::instance();
+                            $model  = Find::parent($path);
+                            $target = $kirby->language();
+
+                            return [
+                                'component' => 'k-text-dialog',
+                                'props' => [
+                                    'submitButton' => t('translatewizard.dialog.submit', 'Translate'),
+                                    'text' => tt('translatewizard.dialog.confirm', 'Translate this page into {lang}?', [
+                                        'lang' => $target->name(),
+                                    ]),
+                                ],
+                            ];
+                        },
+                        'submit' => function (string $path) {
+                            $kirby = App::instance();
+                            $model = Find::parent($path);
+
+                            if ($model->permissions()->can('update') === false) {
+                                throw new PermissionException(message: 'Not allowed.');
+                            }
+
+                            $apiKey = _translatewizard_apiKey($kirby);
+                            if ($apiKey === null) {
+                                throw new InvalidArgumentException(message: 'No DeepL API key configured (kirbydesk.translatewizard.deepl.apiKey).');
+                            }
+
+                            $body   = $kirby->request()->body()->toArray();
+                            $source = $body['from'] ?? $kirby->request()->get('from') ?? $kirby->defaultLanguage()->code();
+                            $target = $kirby->language()->code();
+
+                            if ($source === $target) {
+                                throw new InvalidArgumentException(message: 'Source and target language must differ.');
+                            }
+
+                            $units = (new Translator(new DeepL($apiKey)))
+                                ->translatePage($model, $source, $target);
+
+                            return [
+                                'event'   => 'model.update',
+                                'message' => $units === 0
+                                    ? t('translatewizard.result.nothing', 'Nothing to translate.')
+                                    : tt('translatewizard.result.done', '{units} field(s) translated.', ['units' => $units]),
+                            ];
+                        }
+                    ]
+                ]
+            ];
+        }
+    ],
+
+    'translations' => [
+        'en' => [
+            'translatewizard.button.text'    => 'AI Translation',
+            'translatewizard.action.translate' => 'Translate page',
+            'translatewizard.action.restore' => 'Restore original language',
+            'translatewizard.dialog.submit'  => 'Translate',
+            'translatewizard.dialog.confirm' => 'Translate this page into {lang}?',
+            'translatewizard.reset.submit'   => 'Restore',
+            'translatewizard.reset.confirm'  => 'Restore this language version to the {lang} original? Content in the current language will be overwritten.',
+            'translatewizard.reset.done'     => 'Content restored.',
+            'translatewizard.result.done'    => '{units} field(s) translated.',
+            'translatewizard.result.nothing' => 'Nothing to translate.',
+        ],
+        'de' => [
+            'translatewizard.button.text'    => 'AI Translation',
+            'translatewizard.action.translate' => 'Seite übersetzen',
+            'translatewizard.action.restore' => 'Originalsprache wiederherstellen',
+            'translatewizard.dialog.submit'  => 'Übersetzen',
+            'translatewizard.dialog.confirm' => 'Soll die Seite in {lang} übersetzt werden?',
+            'translatewizard.reset.submit'   => 'Zurücksetzen',
+            'translatewizard.reset.confirm'  => 'Diese Sprachversion auf das {lang}-Original zurücksetzen? Der aktuelle Inhalt geht verloren.',
+            'translatewizard.reset.done'     => 'Inhalt zurückgesetzt.',
+            'translatewizard.result.done'    => '{units} Feld(er) übersetzt.',
+            'translatewizard.result.nothing' => 'Nichts zu übersetzen.',
+        ],
+    ],
+
     'api' => [
         'routes' => [
             [
@@ -32,9 +221,7 @@ Kirby::plugin('kirbydesk/translatewizard', [
                     $model = Find::parent($path);
 
                     if ($model->permissions()->can('update') === false) {
-                        throw new PermissionException(
-                            message: 'You are not allowed to translate this page.'
-                        );
+                        throw new PermissionException(message: 'Not allowed.');
                     }
 
                     $body   = $kirby->request()->body()->toArray();
@@ -51,17 +238,13 @@ Kirby::plugin('kirbydesk/translatewizard', [
                         throw new InvalidArgumentException(message: 'Source and target language must differ.');
                     }
 
-                    $apiKey = $kirby->option('kirbydesk.translatewizard.deepl.apiKey');
-                    if (!is_string($apiKey) || $apiKey === '') {
-                        // fall back to content-translator config
-                        $apiKey = $kirby->option('johannschopplich.content-translator.DeepL.apiKey');
-                    }
-                    if (!is_string($apiKey) || $apiKey === '') {
+                    $apiKey = _translatewizard_apiKey($kirby);
+                    if ($apiKey === null) {
                         throw new InvalidArgumentException(message: 'No DeepL API key configured.');
                     }
 
-                    $translator = new Translator(new DeepL($apiKey));
-                    $units      = $translator->translatePage($model, $source, $target);
+                    $units = (new Translator(new DeepL($apiKey)))
+                        ->translatePage($model, $source, $target);
 
                     return [
                         'status' => 'ok',
