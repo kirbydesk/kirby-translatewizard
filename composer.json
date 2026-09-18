@@ -1,6 +1,6 @@
 {
 	"name": "kirbydesk/kirby-translatewizard",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "AI Translation for Kirby CMS",
 	"type": "kirby-plugin",
 	"keywords": [

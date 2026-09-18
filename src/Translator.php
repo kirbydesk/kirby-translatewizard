@@ -143,8 +143,10 @@ final class Translator
     }
 
     /**
-     * Derive the target-language slug from the translated title. Home
-     * and error page keep their slug — Kirby resolves them by it.
+     * Derive the target-language slug from the translated title — only
+     * on the first translation. Once the language has its own slug, it
+     * stays: the URL may already be published, linked or indexed.
+     * Home and error page keep their slug — Kirby resolves them by it.
      * A slug collision with a sibling is not fatal: the page simply
      * keeps its current slug.
      */
@@ -152,6 +154,7 @@ final class Translator
     {
         if (!$page instanceof Page) return;
         if ($page->isHomeOrErrorPage()) return;
+        if ($page->slug($target) !== $page->uid()) return;
 
         try {
             $page->changeSlug($title, $target);

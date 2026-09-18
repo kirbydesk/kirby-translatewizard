@@ -9,9 +9,11 @@ are translated too.
 
 Besides the Blocks field, the page title and pagewizard's meta fields
 (`metapagetitle`, `metanavigationtitle`, `metateaser`,
-`metadescription`, `metakeywords`) are translated as well. Pages get a
-target-language slug derived from the translated title (home and error
-page keep theirs; on a slug collision the current slug is kept).
+`metadescription`, `metakeywords`) are translated as well. On the first
+translation, pages get a target-language slug derived from the
+translated title. Once a language has its own slug it is never changed
+again, so published URLs stay stable (home and error page keep their
+slug; on a slug collision the current slug is kept).
 
 Adds an **AI** button to page views in every secondary language with
 two actions:
