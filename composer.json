@@ -1,24 +1,32 @@
 {
-    "name": "kirbydesk/kirby-translatewizard",
-    "description": "DeepL-powered translator for kirby-pagewizard blocks. Understands pwtext / pweditor JSON structures and translates only their text payload.",
-    "license": "proprietary",
-    "type": "kirby-plugin",
-    "authors": [
-        {
-            "name": "Kirbydesk"
-        }
-    ],
-    "require": {
-        "php": ">=8.2",
-        "getkirby/composer-installer": "^1.2",
-        "kirbydesk/kirby-pagewizard": "^1.0"
-    },
-    "autoload": {
-        "psr-4": {
-            "Kirbydesk\\Translatewizard\\": "src/"
-        }
-    },
-    "extra": {
-        "kirby-cms-path": false
-    }
+	"name": "kirbydesk/kirby-translatewizard",
+	"version": "1.0.0",
+	"description": "AI Translation for Kirby CMS",
+	"type": "kirby-plugin",
+	"keywords": [
+		"kirby",
+		"kirby-plugin",
+		"translatewizard"
+	],
+	"license": "proprietary",
+	"homepage": "https://github.com/kirbydesk/kirby-translatewizard",
+	"authors": [
+		{
+			"name": "Christian Fickinger",
+			"email": "hello@kirbydesk.com",
+			"homepage": "https://kirbydesk.com"
+		}
+	],
+	"extra": {
+		"installer-name": "kirby-translatewizard"
+	},
+	"autoload": {
+		"psr-4": {
+			"Kirbydesk\\Translatewizard\\": "src/"
+		}
+	},
+	"require": {
+		"getkirby/composer-installer": "^1.2",
+		"kirbydesk/kirby-pagewizard": "^1.0"
+	}
 }
