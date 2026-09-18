@@ -2,78 +2,135 @@
 
 namespace Kirbydesk\Translatewizard;
 
-use Closure;
-
 /**
- * Walks the recursive Blocks-structure that pagewizard produces and
- * yields every field that might carry translatable content. The Blocks
- * field on a page holds an array of block dicts:
+ * Two-phase walker for pagewizard's recursive Blocks structure.
  *
- *   [ {type, id, content: {tagline, heading, editor, blocks, buttons, …}}, …]
+ *   1. decodeAll($blocks)  — parse every JSON-string blocks slot into
+ *      a nested PHP array, so the whole tree is uniformly array-based.
+ *   2. collect($blocks)    — walk the tree, return a list of visits
+ *      {path, value} where path locates each plain field by keys/indexes.
+ *   3. caller replaces values via ::setByPath($blocks, $path, $new).
+ *   4. encodeAll($blocks)  — re-serialize the nested slots back to JSON.
  *
- * Where content fields whose value is a JSON array of blocks are
- * themselves nested Blocks (steplist items, cardlets items, hero
- * buttons, …). This walker descends into those too.
- *
- * The walker is content-only: it does not need the blueprint. It
- * decides what to translate by inspecting field VALUES — a JSON string
- * that decodes to a pwtext/pweditor envelope, or a nested blocks list.
- * Anything else falls through to the "visit plain field" hook, which
- * the caller decides how to handle (translate as text, skip, …).
+ * A path is a list of keys/indexes, e.g. [3, 'content', 'blocks', 1,
+ * 'content', 'heading']. This avoids the PHP-foreach reference and
+ * closure-capture traps that made the mutation-in-place walker unsafe.
  */
 final class BlockWalker
 {
     /**
-     * Walk $blocks in place. For every field encountered, $visit is
-     * called with:
-     *   (fieldName, currentValue, replace)  where replace(newValue)
-     * writes the new value back onto the block. $visit returns void.
-     *
-     * $blocks is passed by reference so the caller receives the mutated
-     * structure.
+     * In-place decode every JSON-encoded nested blocks slot inside
+     * $blocks. After this call the tree is uniformly array-based —
+     * no JSON strings on nested content['blocks']/content['buttons']/etc.
      *
      * @param array<int, array<string, mixed>> $blocks
-     * @param Closure(string $fieldName, mixed $value, Closure $replace): void $visit
      */
-    public static function walk(array &$blocks, Closure $visit): void
+    public static function decodeAll(array &$blocks): void
     {
-        foreach ($blocks as $blockIndex => &$block) {
-            if (!is_array($block) || !isset($block['content']) || !is_array($block['content'])) {
-                continue;
-            }
-
-            foreach ($block['content'] as $fieldName => $value) {
-                // Nested blocks (JSON-encoded array) — descend
-                if (self::looksLikeBlocksJson($value)) {
-                    $inner = json_decode($value, true);
+        foreach (array_keys($blocks) as $i) {
+            if (!is_array($blocks[$i]) || !is_array($blocks[$i]['content'] ?? null)) continue;
+            foreach (array_keys($blocks[$i]['content']) as $k) {
+                $v = $blocks[$i]['content'][$k];
+                if (self::looksLikeBlocksJson($v)) {
+                    $inner = json_decode($v, true);
                     if (is_array($inner)) {
-                        self::walk($inner, $visit);
-                        $block['content'][$fieldName] = json_encode(
-                            $inner,
-                            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-                        );
+                        self::decodeAll($inner);
+                        $blocks[$i]['content'][$k] = $inner;
                     }
-                    continue;
                 }
-
-                // Plain field — hand to caller with a replace closure
-                $replace = function ($newValue) use (&$block, $fieldName): void {
-                    $block['content'][$fieldName] = $newValue;
-                };
-                $visit($fieldName, $value, $replace);
             }
         }
     }
 
+    /**
+     * Walk an already-decoded tree and return every plain field as
+     * {path, value}. Nested blocks slots (now arrays, not strings)
+     * are descended into.
+     *
+     * @param array<int, array<string, mixed>> $blocks
+     * @return list<array{path: list<int|string>, value: mixed}>
+     */
+    public static function collect(array $blocks, array $prefix = []): array
+    {
+        $visits = [];
+        foreach ($blocks as $i => $block) {
+            if (!is_array($block) || !is_array($block['content'] ?? null)) continue;
+            foreach ($block['content'] as $k => $v) {
+                $path = [...$prefix, $i, 'content', $k];
+                if (is_array($v)) {
+                    // nested blocks slot (already decoded to array)
+                    if (self::isBlockList($v)) {
+                        $visits = [...$visits, ...self::collect($v, $path)];
+                    }
+                    continue;
+                }
+                $visits[] = ['path' => $path, 'value' => $v];
+            }
+        }
+        return $visits;
+    }
+
+    /**
+     * Set a value at $path inside a decoded tree.
+     *
+     * @param array<int, mixed> $tree
+     * @param list<int|string> $path
+     */
+    public static function setByPath(array &$tree, array $path, mixed $value): void
+    {
+        $ref = &$tree;
+        foreach ($path as $key) {
+            if (!isset($ref[$key]) && $ref[$key] !== null) {
+                // path invalid — silently ignore
+                return;
+            }
+            $ref = &$ref[$key];
+        }
+        $ref = $value;
+    }
+
+    /**
+     * Re-encode every nested-blocks slot (array → JSON string) so the
+     * whole tree matches Kirby's on-disk shape again.
+     *
+     * @param array<int, array<string, mixed>> $blocks
+     */
+    public static function encodeAll(array &$blocks): void
+    {
+        foreach (array_keys($blocks) as $i) {
+            if (!is_array($blocks[$i]) || !is_array($blocks[$i]['content'] ?? null)) continue;
+            foreach (array_keys($blocks[$i]['content']) as $k) {
+                $v = $blocks[$i]['content'][$k];
+                if (is_array($v) && self::isBlockList($v)) {
+                    self::encodeAll($v);
+                    $blocks[$i]['content'][$k] = json_encode(
+                        $v,
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Does $value look like a JSON-encoded array of blocks?
+     */
     private static function looksLikeBlocksJson(mixed $value): bool
     {
         if (!is_string($value)) return false;
         $trim = ltrim($value);
         if ($trim === '' || $trim[0] !== '[') return false;
         $decoded = json_decode($value, true);
-        if (!is_array($decoded) || $decoded === []) return false;
-        // must look like an array of blocks: each entry is an object with type+content
-        foreach ($decoded as $entry) {
+        return is_array($decoded) && self::isBlockList($decoded);
+    }
+
+    /**
+     * Does $array look like a decoded list of blocks?
+     */
+    private static function isBlockList(array $array): bool
+    {
+        if ($array === []) return false;
+        foreach ($array as $entry) {
             if (!is_array($entry)) return false;
             if (!isset($entry['type']) || !array_key_exists('content', $entry)) return false;
         }

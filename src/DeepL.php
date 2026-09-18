@@ -34,13 +34,51 @@ final class DeepL
             ? 'https://api-free.deepl.com/v2/translate'
             : 'https://api.deepl.com/v2/translate';
 
-        $translated = [];
-        foreach (array_chunk($texts, self::BATCH_LIMIT) as $chunk) {
+        // Split HTML-flavoured payloads (writer's <p>…</p>) from plain
+        // text so DeepL uses tag_handling only where it helps. Plain
+        // strings sent with tag_handling=html come back with & → &amp;
+        // and quotes escaped — bad for pwtext values.
+        $htmlIdx  = [];
+        $plainIdx = [];
+        foreach ($texts as $i => $t) {
+            if (self::containsHtml($t)) {
+                $htmlIdx[] = $i;
+            } else {
+                $plainIdx[] = $i;
+            }
+        }
+
+        $translated = array_fill(0, count($texts), '');
+        foreach ([
+            ['idx' => $htmlIdx,  'tag_handling' => 'html'],
+            ['idx' => $plainIdx, 'tag_handling' => null],
+        ] as $group) {
+            if ($group['idx'] === []) continue;
+            $chunkTexts = array_map(fn ($i) => $texts[$i], $group['idx']);
+            $results    = $this->post($endpoint, $chunkTexts, $targetLang, $sourceLang, $group['tag_handling']);
+            foreach ($group['idx'] as $j => $origIdx) {
+                $translated[$origIdx] = $results[$j] ?? '';
+            }
+        }
+
+        return $translated;
+    }
+
+    /**
+     * @param list<string> $chunk
+     * @return list<string>
+     */
+    private function post(string $endpoint, array $chunk, string $targetLang, ?string $sourceLang, ?string $tagHandling): array
+    {
+        $out = [];
+        foreach (array_chunk($chunk, self::BATCH_LIMIT) as $batch) {
             $body = [
-                'text'        => $chunk,
+                'text'        => $batch,
                 'target_lang' => strtoupper($targetLang),
-                'tag_handling' => 'html',
             ];
+            if ($tagHandling !== null) {
+                $body['tag_handling'] = $tagHandling;
+            }
             if ($sourceLang !== null) {
                 $body['source_lang'] = strtoupper($sourceLang);
             }
@@ -65,10 +103,15 @@ final class DeepL
             }
 
             foreach ($decoded['translations'] as $t) {
-                $translated[] = $t['text'] ?? '';
+                $out[] = $t['text'] ?? '';
             }
         }
 
-        return $translated;
+        return $out;
+    }
+
+    private static function containsHtml(string $text): bool
+    {
+        return preg_match('/<[a-z][a-z0-9]*\b[^>]*>/i', $text) === 1;
     }
 }
