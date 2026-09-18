@@ -65,10 +65,9 @@ Kirby::plugin('kirbydesk/translatewizard', [
 
                         $path = $model->panel()?->path() ?? '';
 
-                        // Restore only makes sense once a translation
-                        // exists (saved or as unsaved changes).
-                        $hasTranslation = $model->version('latest')->exists($current)
-                            || $model->version('changes')->exists($current);
+                        // Restore only makes sense once the language's
+                        // content file (e.g. *.en.txt) exists.
+                        $hasTranslation = $model->version('latest')->exists($current);
 
                         // Kirby's k-view-button treats `options` as an
                         // exclusive dropdown trigger (dialog is ignored
