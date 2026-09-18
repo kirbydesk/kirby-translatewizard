@@ -70,8 +70,8 @@ The actions live in the shared **AI** view button provided by
 kirby-pagewizard (`ai`, requires kirby-pagewizard 1.1.51+). The button
 only shows entries that make sense for the current view: the translate
 actions appear in secondary languages only (Kirby's default language
-cannot translate to itself). When kirby-contentwizard is installed too,
-its entries are added below a separator.
+cannot translate to itself). kirby-contentwizard adds its entry in the
+default language.
 
 Add the button to Kirby's `panel.viewButtons` config:
 
