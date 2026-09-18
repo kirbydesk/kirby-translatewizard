@@ -65,6 +65,11 @@ Kirby::plugin('kirbydesk/translatewizard', [
 
                         $path = $model->panel()?->path() ?? '';
 
+                        // Restore only makes sense once a translation
+                        // exists (saved or as unsaved changes).
+                        $hasTranslation = $model->version('latest')->exists($current)
+                            || $model->version('changes')->exists($current);
+
                         // Kirby's k-view-button treats `options` as an
                         // exclusive dropdown trigger (dialog is ignored
                         // once options is set). We use that: the button
@@ -80,8 +85,9 @@ Kirby::plugin('kirbydesk/translatewizard', [
                                 ],
                                 [
                                     'label'  => t('translatewizard.action.restore', 'Restore'),
-                                    'icon'   => 'refresh',
-                                    'dialog' => 'translatewizard/reset/' . $path,
+                                    'icon'     => 'refresh',
+                                    'dialog'   => 'translatewizard/reset/' . $path,
+                                    'disabled' => $hasTranslation === false,
                                 ],
                             ],
                         ];
