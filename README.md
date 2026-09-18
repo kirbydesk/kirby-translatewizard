@@ -79,8 +79,8 @@ Add the button to Kirby's `panel.viewButtons` config:
 return [
     'panel' => [
         'viewButtons' => [
-            'page' => ['open', 'preview', '-', 'settings', 'ai', 'languages', 'status'],
-            'site' => ['preview', '-', 'ai', 'languages'],
+            'page' => ['open', '-', 'settings', 'ai', 'languages', 'status'],
+            'site' => ['open', '-', 'ai', 'languages'],
         ],
     ],
 ];
