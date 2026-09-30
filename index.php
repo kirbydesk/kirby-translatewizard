@@ -28,6 +28,40 @@ function _translatewizard_apiKey(App $kirby): ?string
     return is_string($key) && $key !== '' ? $key : null;
 }
 
+/**
+ * The translation actions for a page view – only in a secondary language
+ * (the default language cannot translate to itself).
+ */
+function _translatewizard_actions($model): array
+{
+    $kirby   = App::instance();
+    $default = $kirby->defaultLanguage();
+    $current = $kirby->language();
+
+    if ($default === null || $current === null) return [];
+    if ($current->code() === $default->code()) return [];
+
+    $path = $model->panel()?->path() ?? '';
+
+    // Restore only makes sense once the language's
+    // content file (e.g. *.en.txt) exists.
+    $hasTranslation = $model->version('latest')->exists($current);
+
+    return [
+        [
+            'label'  => t('translatewizard.action.translate', 'Translate page with AI'),
+            'icon'   => 'translatewizard-sparkles',
+            'dialog' => 'translatewizard/' . $path,
+        ],
+        [
+            'label'    => t('translatewizard.action.restore', 'Restore original language'),
+            'icon'     => 'refresh',
+            'dialog'   => 'translatewizard/reset/' . $path,
+            'disabled' => $hasTranslation === false,
+        ],
+    ];
+}
+
 Kirby::plugin('kirbydesk/translatewizard', [
     'options' => [
         'deepl.apiKey' => null,
@@ -41,42 +75,25 @@ Kirby::plugin('kirbydesk/translatewizard', [
                 'help'   => t('translatewizard.secret.deepl.help', 'For “Translate page with AI”. Keys ending in :fx use DeepL Free.'),
             ],
         ],
-
-        // Entries for pagewizard's shared "AI" view button. Translating
-        // only makes sense in a secondary language.
-        'aiActions' => function ($model): array {
-            $kirby   = App::instance();
-            $default = $kirby->defaultLanguage();
-            $current = $kirby->language();
-
-            if ($default === null || $current === null) return [];
-            if ($current->code() === $default->code()) return [];
-
-            $path = $model->panel()?->path() ?? '';
-
-            // Restore only makes sense once the language's
-            // content file (e.g. *.en.txt) exists.
-            $hasTranslation = $model->version('latest')->exists($current);
-
-            return [
-                [
-                    'label'  => t('translatewizard.action.translate', 'Translate page with AI'),
-                    'icon'   => 'translatewizard-sparkles',
-                    'dialog' => 'translatewizard/' . $path,
-                ],
-                [
-                    'label'    => t('translatewizard.action.restore', 'Restore original language'),
-                    'icon'     => 'refresh',
-                    'dialog'   => 'translatewizard/reset/' . $path,
-                    'disabled' => $hasTranslation === false,
-                ],
-            ];
-        },
     ],
 
     'areas' => [
         'site' => function () {
             return [
+                // its own view button (panel.viewButtons: "translatewizard"),
+                // in secondary languages only
+                'buttons' => [
+                    'translatewizard' => function ($model = null) {
+                        if ($model === null) return null;
+                        $actions = _translatewizard_actions($model);
+                        if ($actions === []) return null;
+                        return [
+                            'icon'    => 'translatewizard-translate',
+                            'title'   => t('translatewizard.button', 'Translation'),
+                            'options' => $actions,
+                        ];
+                    },
+                ],
                 'dialogs' => [
                     'translatewizard/reset/(:all)' => [
                         'load' => function (string $path) {

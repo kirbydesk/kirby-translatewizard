@@ -1,5 +1,6 @@
 <?php return [
 
+	'translatewizard.button' => 'Translation',
 	'translatewizard.action.translate' => 'Translate page with AI',
 	'translatewizard.action.restore' => 'Restore original language',
 	'translatewizard.dialog.submit'  => 'Translate',

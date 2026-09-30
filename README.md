@@ -15,8 +15,8 @@ translated title. Once a language has its own slug it is never changed
 again, so published URLs stay stable (home and error page keep their
 slug; on a slug collision the current slug is kept).
 
-Adds an **AI** button to page views in every secondary language with
-two actions:
+Adds its own **Translation** button to page views in every secondary
+language with two actions:
 
 - **Translate page with AI** — sends the default-language content through DeepL
   and writes the result to the current secondary language.
@@ -69,12 +69,10 @@ allows up to 500,000 characters per month.
 
 ### Panel button
 
-The actions live in the shared **AI** view button provided by
-kirby-pagewizard (`ai`, requires kirby-pagewizard 1.1.51+). The button
-only shows entries that make sense for the current view: the translate
-actions appear in secondary languages only (Kirby's default language
-cannot translate to itself). kirby-contentwizard adds its entry in the
-default language.
+The actions live in the plugin's own view button `translatewizard`. It
+appears in secondary languages only (Kirby's default language cannot
+translate to itself). kirby-contentwizard brings its own button
+(`contentwizard`) for the default language.
 
 Add the button to Kirby's `panel.viewButtons` config:
 
@@ -82,7 +80,7 @@ Add the button to Kirby's `panel.viewButtons` config:
 return [
     'panel' => [
         'viewButtons' => [
-            'page' => ['open', '-', 'settings', 'ai', 'languages', 'status'],
+            'page' => ['open', '-', 'settings', 'contentwizard', 'translatewizard', 'languages', 'status'],
             'site' => ['open', 'languages'],
         ],
     ],
@@ -91,7 +89,7 @@ return [
 
 This config only applies to blueprints that do **not** declare their
 own `buttons:`. If a page blueprint declares its own list, add
-`- ai` to it explicitly — Kirby always prefers the blueprint list over
+`- translatewizard` to it explicitly — Kirby always prefers the blueprint list over
 the config default.
 
 ## API
