@@ -7,7 +7,7 @@
 	'translatewizard.action.translate' => 'Seite übersetzen',
 	'translatewizard.action.delete' => 'Übersetzung löschen',
 	'translatewizard.delete.submit' => 'Löschen',
-	'translatewizard.delete.confirm' => 'Die Übersetzung in {lang} löschen? Die Seite und die Texte ihrer Bilder zeigen dann wieder den Inhalt der Originalsprache.',
+	'translatewizard.delete.confirm' => 'Die Übersetzung in {lang} löschen? Die Seite und die Texte ihrer Medien zeigen dann wieder den Inhalt der Originalsprache.',
 	'translatewizard.delete.done' => 'Übersetzung gelöscht.',
 	'translatewizard.action.to' => 'Übersetzen in: {lang}',
 	'translatewizard.action.missing' => 'Fehlende Sprachen übersetzen',

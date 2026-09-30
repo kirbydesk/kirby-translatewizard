@@ -7,7 +7,7 @@
 	'translatewizard.action.translate' => 'Translate page',
 	'translatewizard.action.delete' => 'Delete translation',
 	'translatewizard.delete.submit' => 'Delete',
-	'translatewizard.delete.confirm' => 'Delete the translation into {lang}? The page and the texts of its images then show the content of the original language again.',
+	'translatewizard.delete.confirm' => 'Delete the translation into {lang}? The page and the texts of its media then show the content of the original language again.',
 	'translatewizard.delete.done' => 'Translation deleted.',
 	'translatewizard.action.to' => 'Translate into: {lang}',
 	'translatewizard.action.missing' => 'Translate missing languages',
