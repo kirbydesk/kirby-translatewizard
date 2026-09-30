@@ -156,10 +156,20 @@ final class Fields
             'fields'   => [],
             'children' => $templates,
         ]];
+        // the blocks, each with its text fields and nested blocks
+        $blocks = [];
         foreach ([...$roots, ...$shared] as $type) {
             $n = $node($type);
-            if ($n) $tree[] = $n;
+            if ($n) $blocks[] = $n;
         }
+        $tree[] = [
+            'key'      => 'blocks',
+            'code'     => null,
+            'label'    => (string) I18n::translate('translatewizard.fields.blocks', 'Blocks'),
+            'icon'     => 'box',
+            'fields'   => [],
+            'children' => $blocks,
+        ];
         return $tree;
     }
 

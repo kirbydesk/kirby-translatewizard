@@ -1,6 +1,7 @@
 <?php return [
 
 	'translatewizard.fields.templates' => 'Templates',
+	'translatewizard.fields.blocks' => 'Blocks',
 	'translatewizard.button' => 'Translation',
 	'translatewizard.action.translate' => 'Translate page with AI',
 	'translatewizard.action.restore' => 'Restore original language',
