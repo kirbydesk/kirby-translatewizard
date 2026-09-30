@@ -79,6 +79,8 @@ Kirby::plugin('kirbydesk/translatewizard', [
                     str_ends_with($key, ':fx') ? 'https://api-free.deepl.com/v2/usage' : 'https://api.deepl.com/v2/usage',
                     ['Authorization: DeepL-Auth-Key ' . $key]
                 ),
+                // the kind of key, by its ending
+                'type'   => fn (string $key): string => str_ends_with($key, ':fx') ? 'Free' : 'Pro',
             ],
         ],
     ],
