@@ -27,6 +27,9 @@ final class Fields
     /** Field types whose value is text. */
     public const TEXT_TYPES = ['text', 'textarea', 'writer', 'markdown', 'list', 'pwtext', 'pweditor', 'tags'];
 
+    /** Blocks fields: Kirby's own and pagewizard's for the pages. */
+    private const BLOCKS_TYPES = ['blocks', 'pwblocks'];
+
     /** Off unless switched on: ids (the anchor) and names – the media's
      *  credits and a logo's name – rather than words. */
     private const OFF = ['fragment', 'mediacreator', 'mediacredit', 'mediacopyright', 'mediasource', 'logoname'];
@@ -107,7 +110,7 @@ final class Fields
     {
         $all = self::pageFields();
         if (!isset($all[$template])) return ['blocks'];
-        return array_keys(array_filter($all[$template]['fields'], fn ($p) => ($p['type'] ?? '') === 'blocks'));
+        return array_keys(array_filter($all[$template]['fields'], fn ($p) => in_array($p['type'] ?? '', self::BLOCKS_TYPES, true)));
     }
 
     /**
@@ -371,7 +374,7 @@ final class Fields
             $fields = self::fieldsOf($bp);
             $nested = [];
             foreach ($fields as $props) {
-                if (($props['type'] ?? '') !== 'blocks') continue;
+                if (!in_array($props['type'] ?? '', self::BLOCKS_TYPES, true)) continue;
                 foreach ((array) ($props['fieldsets'] ?? []) as $k => $v) {
                     $nested[] = is_string($v) ? $v : (string) $k;
                 }
