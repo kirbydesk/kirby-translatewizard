@@ -11,9 +11,9 @@ use Throwable;
 /**
  * Which fields are translated. The candidates come from the blueprints:
  * every field of a text type (text, textarea, writer, markdown, list and
- * pagewizard's pwtext / pweditor), in the blocks and in the page
- * templates (their title and fields); a structure field counts with its
- * text columns. Each can
+ * pagewizard's pwtext / pweditor), in the blocks, in the page
+ * templates (their title and fields) and in the file templates (the
+ * media's texts); a structure field counts with its text columns. Each can
  * be switched off in the Project Wizard (Settings › Translation); the
  * choice lives in the project's content/.projectwizard/translate.json,
  * as the differences from the start values:
@@ -27,8 +27,9 @@ final class Fields
     /** Field types whose value is text. */
     public const TEXT_TYPES = ['text', 'textarea', 'writer', 'markdown', 'list', 'pwtext', 'pweditor', 'tags'];
 
-    /** Text fields holding ids, never words: off unless switched on. */
-    private const OFF = ['fragment'];
+    /** Off unless switched on: ids (the anchor) and names – the media's
+     *  credits and a logo's name – rather than words. */
+    private const OFF = ['fragment', 'mediacreator', 'mediacredit', 'mediacopyright', 'mediasource', 'logoname'];
 
     /** Kirby's own blocks: not part of pagewizard's pages. */
     private const CORE_BLOCKS = ['code', 'gallery', 'heading', 'image', 'line', 'list', 'markdown', 'quote', 'table', 'text', 'video'];
@@ -38,6 +39,9 @@ final class Fields
 
     /** @var array<string, array>|null page template => label, icon, fields */
     private static ?array $pageFields = null;
+
+    /** @var array<string, array>|null file template => label, icon, fields */
+    private static ?array $fileFields = null;
 
     private static ?array $stored = null;
 
@@ -79,6 +83,18 @@ final class Fields
             'title' => ['type' => 'text', 'label' => (string) I18n::translate('title', 'Title')],
             ...self::textFields($all[$template]['fields']),
         ];
+    }
+
+    /**
+     * The text fields of a file template (the media's texts: alternative
+     * text, caption, description …). Null for a template without blueprint.
+     *
+     * @return array<string, array{type: string, label: string, columns?: array}>|null
+     */
+    public static function ofFile(string $template): ?array
+    {
+        $all = self::fileFields();
+        return isset($all[$template]) ? self::textFields($all[$template]['fields']) : null;
     }
 
     /**
@@ -176,6 +192,23 @@ final class Fields
         usort($blocks, $byLabel);
         usort($sharedNodes, $byLabel);
         $blocks = [...$blocks, ...$sharedNodes];
+        // the media: the file templates, each with its text fields
+        $media = [];
+        foreach (self::fileFields() as $template => $info) {
+            $fields = self::nodeFields('file:' . $template, self::ofFile($template) ?? []);
+            if (!$fields) continue;
+            $media[] = [
+                'key'      => 'file:' . $template,
+                'code'     => null,
+                'title'    => $template,
+                'label'    => $info['label'],
+                'icon'     => $info['icon'],
+                'fields'   => $fields,
+                'children' => [],
+            ];
+        }
+        usort($media, fn ($a, $b) => strcasecmp(Str::ascii($a['label']), Str::ascii($b['label'])));
+
         $tree[] = [
             'key'      => 'blocks',
             'code'     => null,
@@ -183,6 +216,14 @@ final class Fields
             'icon'     => 'box',
             'fields'   => [],
             'children' => $blocks,
+        ];
+        $tree[] = [
+            'key'      => 'files',
+            'code'     => null,
+            'label'    => (string) I18n::translate('translatewizard.fields.files', 'Media'),
+            'icon'     => 'image',
+            'fields'   => [],
+            'children' => $media,
         ];
         return $tree;
     }
@@ -222,6 +263,8 @@ final class Fields
     {
         $out = [];
         foreach ($fields as $name => $props) {
+            // (a field Kirby keeps the same in every language: never)
+            if (($props['translate'] ?? true) === false) continue;
             $fieldType = $props['type'] ?? '';
             if (in_array($fieldType, self::TEXT_TYPES, true)) {
                 $out[$name] = ['type' => $fieldType, 'label' => self::label($props['label'] ?? null, $name)];
@@ -238,6 +281,27 @@ final class Fields
             }
         }
         return $out;
+    }
+
+    /** @return array<string, array{label: string, icon: string, fields: array}> */
+    private static function fileFields(): array
+    {
+        if (self::$fileFields !== null) return self::$fileFields;
+        $out = [];
+        foreach (App::instance()->blueprints('files') as $template) {
+            try {
+                $bp = Blueprint::find('files/' . $template);
+            } catch (Throwable) {
+                continue;
+            }
+            if (!is_array($bp)) continue;
+            $out[$template] = [
+                'label'  => self::label($bp['title'] ?? null, $template),
+                'icon'   => is_string($bp['icon'] ?? null) ? $bp['icon'] : 'image',
+                'fields' => self::fieldsOf($bp),
+            ];
+        }
+        return self::$fileFields = $out;
     }
 
     /** @return array<string, array{label: string, icon: string, fields: array}> */

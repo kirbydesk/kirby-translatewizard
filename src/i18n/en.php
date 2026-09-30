@@ -2,6 +2,7 @@
 
 	'translatewizard.fields.templates' => 'Templates',
 	'translatewizard.fields.blocks' => 'Blocks',
+	'translatewizard.fields.files' => 'Media',
 	'translatewizard.button' => 'Translation',
 	'translatewizard.action.translate' => 'Translate page with AI',
 	'translatewizard.action.restore' => 'Restore original language',

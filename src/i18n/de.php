@@ -2,6 +2,7 @@
 
 	'translatewizard.fields.templates' => 'Templates',
 	'translatewizard.fields.blocks' => 'Blöcke',
+	'translatewizard.fields.files' => 'Medien',
 	'translatewizard.button' => 'Übersetzung',
 	'translatewizard.action.translate' => 'Seite mit KI übersetzen',
 	'translatewizard.action.restore' => 'Originalsprache wiederherstellen',

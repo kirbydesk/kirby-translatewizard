@@ -5,13 +5,14 @@ namespace Kirbydesk\Translatewizard;
 use Kirby\Cms\Page;
 use Kirby\Cms\Site;
 use Kirby\Data\Data;
+use Kirby\Uuid\Uuid;
 use Throwable;
 
 /**
  * Translates a page between two languages. Reads the source-language
  * content, collects the translatable texts – the text fields of the
- * page's template (title, meta fields …) and its blocks fields, walked
- * recursively into nested blocks / buttons – hands them to DeepL in one
+ * page's template (title, meta fields …), its blocks fields, walked
+ * recursively into nested blocks / buttons, and its media's texts – hands them to DeepL in one
  * batch, and writes the result back to the target language. Pages also
  * get a slug derived from the translated title. Which fields count: their
  * type in the blueprints and the choice in the Project Wizard (Fields).
@@ -93,6 +94,28 @@ final class Translator
             $this->collectBlocks($trees[$field]);
         }
 
+        // ---- the media: the page's files, and the files it uses from
+        // elsewhere that have no translation yet (Fields: file templates) ----
+        $fileSlots = [];
+        foreach ($this->files($page, $content, $target) as $file) {
+            $fields = Fields::ofFile($file->template() ?? '');
+            if (!$fields) continue;
+            $fileContent = $file->content($source)->toArray();
+            $slots = [];
+            foreach ($fields as $field => $props) {
+                if ($props['type'] === 'structure' || !Fields::enabled('file:' . $file->template(), $field)) continue;
+                $value = $fileContent[$field] ?? null;
+                if ($props['type'] === 'tags' && is_string($value)) {
+                    $tags = array_values(array_filter(array_map(fn ($t) => $this->add(trim($t)), explode(',', $value))));
+                    if ($tags) $slots[$field] = ['kind' => 'tags', 'slots' => $tags];
+                    continue;
+                }
+                $slot = $this->add($value);
+                if ($slot) $slots[$field] = ['kind' => 'text', 'slots' => [$slot]];
+            }
+            if ($slots) $fileSlots[] = ['file' => $file, 'slots' => $slots];
+        }
+
         if ($this->dryRun || $this->deepl === null) {
             $this->sent = $this->texts;
             return count($this->texts);
@@ -138,11 +161,49 @@ final class Translator
             $page = $page->update($update, $target);
         }
 
+        foreach ($fileSlots as $entry) {
+            $fileUpdate = [];
+            foreach ($entry['slots'] as $field => $slotEntry) {
+                $fileUpdate[$field] = $slotEntry['kind'] === 'tags'
+                    ? implode(', ', array_map($result, $slotEntry['slots']))
+                    : $result($slotEntry['slots'][0]);
+            }
+            $entry['file']->update($fileUpdate, $target);
+        }
+
         if (isset($update['title'])) {
             $this->translateSlug($page, $update['title'], $target);
         }
 
         return count($this->texts);
+    }
+
+    /**
+     * The files to translate with the page: its own (always, as its
+     * content), and those it uses from elsewhere (file:// in its content)
+     * while they have no translation in the target language yet – a file
+     * shared by many pages is not translated again with each of them.
+     *
+     * @return list<\Kirby\Cms\File>
+     */
+    private function files(Page|Site $page, array $content, string $target): array
+    {
+        $files = [];
+        foreach ($page->files() as $file) $files[$file->id()] = $file;
+
+        $raw = implode("\n", array_filter($content, 'is_string'));
+        preg_match_all('~file://[A-Za-z0-9]+~', $raw, $matches);
+        foreach (array_unique($matches[0]) as $uuid) {
+            try {
+                $file = Uuid::for($uuid)?->model();
+            } catch (Throwable) {
+                continue;
+            }
+            if (!$file instanceof \Kirby\Cms\File || isset($files[$file->id()])) continue;
+            if ($file->version('latest')->exists($target)) continue;
+            $files[$file->id()] = $file;
+        }
+        return array_values($files);
     }
 
     /**

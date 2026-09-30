@@ -10,7 +10,10 @@ are translated too.
 Which fields are translated follows their type in the blueprints: text,
 textarea, writer, markdown, list, tags and pagewizard's `pwtext` /
 `pweditor` (a structure with its text columns) – in the page's template
-(its title and fields) and in the blocks of its blocks fields. Everything else – links,
+(its title and fields), in the blocks of its blocks fields and in its media
+(file templates: alternative text, caption …). Files the page uses from
+elsewhere are translated only while they have no translation yet; fields
+with `translate: false` never. Everything else – links,
 icons, options – is never sent. In the Project Wizard (**Settings →
 Translation**) each field can be switched off in a tree of the templates and blocks;
 fields holding ids (`fragment`, the anchor) start switched off.
