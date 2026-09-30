@@ -48,20 +48,25 @@ function _translatewizard_actions($model): array
     if ($current->code() === $default->code()) {
         $actions = [];
         $others  = $kirby->languages()->filter(fn ($l) => $l->code() !== $default->code());
+        $missing = 0;
         foreach ($others as $language) {
+            // (translated already: greyed out – nothing is overwritten here)
             $exists    = $model->version('latest')->exists($language->code());
+            $missing  += $exists ? 0 : 1;
             $actions[] = [
-                'label'  => tt($exists ? 'translatewizard.action.to.overwrite' : 'translatewizard.action.to', ['lang' => $language->name()]),
-                'icon'   => 'translatewizard-sparkles',
-                'dialog' => 'translatewizard/to/' . $language->code() . '/' . $path,
+                'label'    => tt('translatewizard.action.to', ['lang' => $language->name()]),
+                'icon'     => 'translatewizard-sparkles',
+                'dialog'   => 'translatewizard/to/' . $language->code() . '/' . $path,
+                'disabled' => $exists,
             ];
         }
         if ($others->count() > 1) {
             $actions[] = '-';
             $actions[] = [
-                'label'  => t('translatewizard.action.all', 'Translate into all languages'),
-                'icon'   => 'translatewizard-sparkles',
-                'dialog' => 'translatewizard/to/all/' . $path,
+                'label'    => t('translatewizard.action.missing', 'Translate all missing languages'),
+                'icon'     => 'translatewizard-sparkles',
+                'dialog'   => 'translatewizard/to/missing/' . $path,
+                'disabled' => $missing === 0,
             ];
         }
         return $actions;
@@ -87,19 +92,21 @@ function _translatewizard_actions($model): array
 }
 
 /**
- * The secondary languages a dialog translates into: one by its code, or
- * all ("all").
+ * The secondary languages a dialog translates into – one by its code, or
+ * all missing ("missing") – never one with a translation already.
  *
  * @return list<\Kirby\Cms\Language>
  */
-function _translatewizard_targets(string $to): array
+function _translatewizard_targets(string $to, $model): array
 {
     $kirby   = App::instance();
     $default = $kirby->defaultLanguage()->code();
     $out     = [];
     foreach ($kirby->languages() as $language) {
         if ($language->code() === $default) continue;
-        if ($to === 'all' || $language->code() === $to) $out[] = $language;
+        // (never over an existing translation)
+        if ($model->version('latest')->exists($language->code())) continue;
+        if ($to === 'missing' || $language->code() === $to) $out[] = $language;
     }
     if ($out === []) {
         throw new InvalidArgumentException(message: 'Unknown target language.');
@@ -214,15 +221,10 @@ Kirby::plugin('kirbydesk/translatewizard', [
                             $kirby   = App::instance();
                             $model   = Find::parent($path);
                             $source  = $kirby->defaultLanguage()->code();
-                            $targets = _translatewizard_targets($to);
+                            $targets = _translatewizard_targets($to, $model);
                             $chars   = _translatewizard_chars($model, $source) * count($targets);
                             $names   = implode(', ', array_map(fn ($l) => $l->name(), $targets));
-                            $exists  = array_filter($targets, fn ($l) => $model->version('latest')->exists($l->code()));
-
-                            $text = '<p>' . tt('translatewizard.dialog.chars', ['chars' => number_format($chars, 0, ',', '.'), 'lang' => $names]) . '</p>';
-                            if ($exists) {
-                                $text .= '<p><strong>' . t('translatewizard.dialog.overwrite', 'Existing translations are translated again.') . '</strong></p>';
-                            }
+                            $text    = tt('translatewizard.dialog.chars', ['chars' => number_format($chars, 0, ',', '.'), 'lang' => $names]);
 
                             return [
                                 'component' => 'k-text-dialog',
@@ -249,7 +251,7 @@ Kirby::plugin('kirbydesk/translatewizard', [
                             }
 
                             $source  = $kirby->defaultLanguage()->code();
-                            $targets = _translatewizard_targets($to);
+                            $targets = _translatewizard_targets($to, $model);
                             $units   = 0;
                             foreach ($targets as $language) {
                                 $units += (new Translator(new DeepL($apiKey)))
