@@ -88,9 +88,11 @@ Kirby::plugin('kirbydesk/translatewizard', [
                         $actions = _translatewizard_actions($model);
                         if ($actions === []) return null;
                         return [
-                            'icon'    => 'translatewizard-translate',
-                            'title'   => t('translatewizard.button', 'Translation'),
-                            'options' => $actions,
+                            'icon'     => 'translatewizard-translate',
+                            'title'    => t('translatewizard.button', 'Translation'),
+                            'options'  => $actions,
+                            // (the arrow: it opens a menu)
+                            'dropdown' => true,
                         ];
                     },
                 ],
