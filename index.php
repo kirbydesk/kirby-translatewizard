@@ -223,7 +223,8 @@ Kirby::plugin('kirbydesk/translatewizard', [
                             $source  = $kirby->defaultLanguage()->code();
                             $targets = _translatewizard_targets($to, $model);
                             $chars   = _translatewizard_chars($model, $source) * count($targets);
-                            $text    = tt('translatewizard.dialog.chars', ['chars' => number_format($chars, 0, ',', '.')]);
+                            // (the characters in bold)
+                            $text    = tt('translatewizard.dialog.chars', ['chars' => '<strong>~' . number_format($chars, 0, ',', '.') . '</strong>']);
 
                             return [
                                 'component' => 'k-text-dialog',

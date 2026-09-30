@@ -8,7 +8,7 @@
 	'translatewizard.action.restore' => 'Originalsprache wiederherstellen',
 	'translatewizard.action.to' => 'Übersetzen in: {lang}',
 	'translatewizard.action.missing' => 'Alle fehlenden Sprachen übersetzen',
-	'translatewizard.dialog.chars' => 'Es werden ~{chars} Zeichen an DeepL geschickt.',
+	'translatewizard.dialog.chars' => 'Es werden {chars} Zeichen an DeepL geschickt.',
 	'translatewizard.result.to' => 'Nach {lang} übersetzt ({units} Felder).',
 	'translatewizard.dialog.submit'  => 'Übersetzen',
 	'translatewizard.dialog.confirm' => 'Soll die Seite in {lang} übersetzt werden?',
