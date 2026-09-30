@@ -40,9 +40,32 @@ function _translatewizard_actions($model): array
     $current = $kirby->language();
 
     if ($default === null || $current === null) return [];
-    if ($current->code() === $default->code()) return [];
 
     $path = $model->panel()?->path() ?? '';
+
+    // the original language: into each secondary language (a hint where
+    // a translation exists already), into all of them at once
+    if ($current->code() === $default->code()) {
+        $actions = [];
+        $others  = $kirby->languages()->filter(fn ($l) => $l->code() !== $default->code());
+        foreach ($others as $language) {
+            $exists    = $model->version('latest')->exists($language->code());
+            $actions[] = [
+                'label'  => tt($exists ? 'translatewizard.action.to.overwrite' : 'translatewizard.action.to', ['lang' => $language->name()]),
+                'icon'   => 'translatewizard-sparkles',
+                'dialog' => 'translatewizard/to/' . $language->code() . '/' . $path,
+            ];
+        }
+        if ($others->count() > 1) {
+            $actions[] = '-';
+            $actions[] = [
+                'label'  => t('translatewizard.action.all', 'Translate into all languages'),
+                'icon'   => 'translatewizard-sparkles',
+                'dialog' => 'translatewizard/to/all/' . $path,
+            ];
+        }
+        return $actions;
+    }
 
     // Restore only makes sense once the language's
     // content file (e.g. *.en.txt) exists.
@@ -61,6 +84,38 @@ function _translatewizard_actions($model): array
             'disabled' => $hasTranslation === false,
         ],
     ];
+}
+
+/**
+ * The secondary languages a dialog translates into: one by its code, or
+ * all ("all").
+ *
+ * @return list<\Kirby\Cms\Language>
+ */
+function _translatewizard_targets(string $to): array
+{
+    $kirby   = App::instance();
+    $default = $kirby->defaultLanguage()->code();
+    $out     = [];
+    foreach ($kirby->languages() as $language) {
+        if ($language->code() === $default) continue;
+        if ($to === 'all' || $language->code() === $to) $out[] = $language;
+    }
+    if ($out === []) {
+        throw new InvalidArgumentException(message: 'Unknown target language.');
+    }
+    return $out;
+}
+
+/**
+ * The characters a translation of $model would send to DeepL (a dry run:
+ * nothing sent, nothing written).
+ */
+function _translatewizard_chars($model, string $source): int
+{
+    $translator = new Translator(null, true);
+    $translator->translatePage($model, $source, $source);
+    return array_sum(array_map(fn ($t) => mb_strlen(strip_tags((string) $t)), $translator->sent));
 }
 
 Kirby::plugin('kirbydesk/translatewizard', [
@@ -151,6 +206,64 @@ Kirby::plugin('kirbydesk/translatewizard', [
                                 'message' => t('translatewizard.reset.done', 'Content reset.'),
                             ];
                         }
+                    ],
+                    // from the original language into one language (or all):
+                    // asked first with the characters it costs
+                    'translatewizard/to/(:any)/(:all)' => [
+                        'load' => function (string $to, string $path) {
+                            $kirby   = App::instance();
+                            $model   = Find::parent($path);
+                            $source  = $kirby->defaultLanguage()->code();
+                            $targets = _translatewizard_targets($to);
+                            $chars   = _translatewizard_chars($model, $source) * count($targets);
+                            $names   = implode(', ', array_map(fn ($l) => $l->name(), $targets));
+                            $exists  = array_filter($targets, fn ($l) => $model->version('latest')->exists($l->code()));
+
+                            $text = '<p>' . tt('translatewizard.dialog.chars', ['chars' => number_format($chars, 0, ',', '.'), 'lang' => $names]) . '</p>';
+                            if ($exists) {
+                                $text .= '<p><strong>' . t('translatewizard.dialog.overwrite', 'Existing translations are translated again.') . '</strong></p>';
+                            }
+
+                            return [
+                                'component' => 'k-text-dialog',
+                                'props' => [
+                                    'submitButton' => [
+                                        'text'  => t('translatewizard.dialog.submit', 'Translate'),
+                                        'icon'  => 'translatewizard-translate',
+                                        'theme' => 'positive',
+                                    ],
+                                    'text' => $text,
+                                ],
+                            ];
+                        },
+                        'submit' => function (string $to, string $path) {
+                            $kirby = App::instance();
+                            $model = Find::parent($path);
+
+                            if ($model->permissions()->can('update') === false) {
+                                throw new PermissionException(message: 'Not allowed.');
+                            }
+                            $apiKey = _translatewizard_apiKey($kirby);
+                            if ($apiKey === null) {
+                                throw new InvalidArgumentException(message: 'No DeepL API key configured.');
+                            }
+
+                            $source  = $kirby->defaultLanguage()->code();
+                            $targets = _translatewizard_targets($to);
+                            $units   = 0;
+                            foreach ($targets as $language) {
+                                $units += (new Translator(new DeepL($apiKey)))
+                                    ->translatePage($model, $source, $language->code());
+                            }
+
+                            return [
+                                'event'   => 'model.update',
+                                'message' => tt('translatewizard.result.to', [
+                                    'lang'  => implode(', ', array_map(fn ($l) => $l->name(), $targets)),
+                                    'units' => $units,
+                                ]),
+                            ];
+                        },
                     ],
                     'translatewizard/(:all)' => [
                         'load' => function (string $path) {
