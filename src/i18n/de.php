@@ -10,7 +10,7 @@
 	'translatewizard.delete.confirm' => 'Die Übersetzung in {lang} löschen? Die Seite zeigt dann wieder den Inhalt der Originalsprache.',
 	'translatewizard.delete.done' => 'Übersetzung gelöscht.',
 	'translatewizard.action.to' => 'Übersetzen in: {lang}',
-	'translatewizard.action.missing' => 'Alle fehlenden Sprachen übersetzen',
+	'translatewizard.action.missing' => 'Fehlende Sprachen übersetzen',
 	'translatewizard.dialog.chars' => 'Es werden {chars} Zeichen an DeepL geschickt.',
 	'translatewizard.result.to' => 'Nach {lang} übersetzt ({units} Felder).',
 	'translatewizard.dialog.submit'  => 'Übersetzen',

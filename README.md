@@ -32,7 +32,7 @@ Adds its own **Translation** button to page views:
 
 - In the **original language**: *Translate into: …* for each secondary
   language that has no translation yet (a language with one is greyed
-  out), and *Translate all missing languages* when there are several.
+  out), and *Translate missing languages* when there are several.
 - In a **secondary language**: *Translate page* while it has no
   translation, *Delete translation* once it has one – the page then shows
   the original language again (the translated slug goes with it).
