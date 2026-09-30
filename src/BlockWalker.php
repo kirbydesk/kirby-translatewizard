@@ -43,12 +43,14 @@ final class BlockWalker
     }
 
     /**
-     * Walk an already-decoded tree and return every plain field as
-     * {path, value}. Nested blocks slots (now arrays, not strings)
-     * are descended into.
+     * Walk an already-decoded tree and return every field as
+     * {path, value, type, field} – the block type and the field name
+     * with it. Nested blocks slots (now arrays, not strings) are
+     * descended into; other arrays (a structure's rows) are returned
+     * as values.
      *
      * @param array<int, array<string, mixed>> $blocks
-     * @return list<array{path: list<int|string>, value: mixed}>
+     * @return list<array{path: list<int|string>, value: mixed, type: string, field: string}>
      */
     public static function collect(array $blocks, array $prefix = []): array
     {
@@ -57,17 +59,29 @@ final class BlockWalker
             if (!is_array($block) || !is_array($block['content'] ?? null)) continue;
             foreach ($block['content'] as $k => $v) {
                 $path = [...$prefix, $i, 'content', $k];
-                if (is_array($v)) {
+                if (is_array($v) && self::isBlockList($v)) {
                     // nested blocks slot (already decoded to array)
-                    if (self::isBlockList($v)) {
-                        $visits = [...$visits, ...self::collect($v, $path)];
-                    }
+                    $visits = [...$visits, ...self::collect($v, $path)];
                     continue;
                 }
-                $visits[] = ['path' => $path, 'value' => $v];
+                $visits[] = ['path' => $path, 'value' => $v, 'type' => (string) ($block['type'] ?? ''), 'field' => strtolower((string) $k)];
             }
         }
         return $visits;
+    }
+
+    /**
+     * The value at $path inside a decoded tree (null when there is none).
+     *
+     * @param list<int|string> $path
+     */
+    public static function getByPath(array $tree, array $path): mixed
+    {
+        foreach ($path as $key) {
+            if (!is_array($tree) || !array_key_exists($key, $tree)) return null;
+            $tree = $tree[$key];
+        }
+        return $tree;
     }
 
     /**

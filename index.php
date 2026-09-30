@@ -5,6 +5,7 @@ use Kirby\Cms\Find;
 use Kirby\Exception\InvalidArgumentException;
 use Kirby\Exception\PermissionException;
 use Kirbydesk\Translatewizard\DeepL;
+use Kirbydesk\Translatewizard\Fields;
 use Kirbydesk\Translatewizard\Translator;
 
 @include_once __DIR__ . '/vendor/autoload.php';
@@ -201,6 +202,41 @@ Kirby::plugin('kirbydesk/translatewizard', [
 
     'api' => [
         'routes' => [
+            // Settings › Translation in the Project Wizard: the tree of the
+            // translated fields, the choice saved (site update rights)
+            [
+                'pattern' => 'translatewizard/fields',
+                'method'  => 'GET',
+                'action'  => fn () => ['tree' => Fields::tree()],
+            ],
+            [
+                'pattern' => 'translatewizard/fields',
+                'method'  => 'POST',
+                'action'  => function () {
+                    $kirby = App::instance();
+                    if ($kirby->user()?->role()->permissions()->for('site', 'update') !== true) {
+                        throw new PermissionException(message: 'Not allowed.');
+                    }
+                    $values = $kirby->request()->body()->get('fields');
+                    Fields::save(is_array($values) ? $values : []);
+                    return ['tree' => Fields::tree()];
+                },
+            ],
+            // the DeepL account's usage this period (characters, limit);
+            // null without key or when DeepL does not answer
+            [
+                'pattern' => 'translatewizard/usage',
+                'method'  => 'GET',
+                'action'  => function () {
+                    $apiKey = _translatewizard_apiKey(App::instance());
+                    if ($apiKey === null) return ['usage' => null];
+                    try {
+                        return ['usage' => (new DeepL($apiKey))->usage()];
+                    } catch (Throwable $e) {
+                        return ['usage' => null, 'error' => $e->getMessage()];
+                    }
+                },
+            ],
             [
                 'pattern' => '(:all)/translatewizard/translate',
                 'method'  => 'POST',

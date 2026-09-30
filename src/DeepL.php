@@ -110,6 +110,32 @@ final class DeepL
         return $out;
     }
 
+    /**
+     * The account's usage this billing period: characters translated and
+     * the limit (DeepL's /v2/usage).
+     *
+     * @return array{count: int, limit: int}
+     */
+    public function usage(): array
+    {
+        $endpoint = str_ends_with($this->apiKey, ':fx')
+            ? 'https://api-free.deepl.com/v2/usage'
+            : 'https://api.deepl.com/v2/usage';
+
+        $response = Remote::request($endpoint, [
+            'method'  => 'GET',
+            'headers' => ['Authorization: DeepL-Auth-Key ' . $this->apiKey],
+        ]);
+        if ($response->code() < 200 || $response->code() >= 300) {
+            throw new RuntimeException('DeepL error: ' . ($response->content() ?: 'HTTP ' . $response->code()));
+        }
+        $data = json_decode($response->content(), true);
+        if (!is_array($data) || !isset($data['character_count'], $data['character_limit'])) {
+            throw new RuntimeException('DeepL: malformed response');
+        }
+        return ['count' => (int) $data['character_count'], 'limit' => (int) $data['character_limit']];
+    }
+
     private static function containsHtml(string $text): bool
     {
         return preg_match('/<[a-z][a-z0-9]*\b[^>]*>/i', $text) === 1;

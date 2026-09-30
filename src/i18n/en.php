@@ -1,5 +1,12 @@
 <?php return [
 
+	'translatewizard.fields.page' => 'Page',
+	'translatewizard.fields.title' => 'Title',
+	'translatewizard.fields.metapagetitle' => 'Page title (SEO)',
+	'translatewizard.fields.metanavigationtitle' => 'Navigation title',
+	'translatewizard.fields.metateaser' => 'Teaser',
+	'translatewizard.fields.metadescription' => 'Description (SEO)',
+	'translatewizard.fields.metakeywords' => 'Keywords',
 	'translatewizard.button' => 'Translation',
 	'translatewizard.action.translate' => 'Translate page with AI',
 	'translatewizard.action.restore' => 'Restore original language',

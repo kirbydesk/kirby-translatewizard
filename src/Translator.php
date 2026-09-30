@@ -13,7 +13,8 @@ use Throwable;
  * recursively into nested blocks / buttons), the title and pagewizard's
  * meta fields — hands them to DeepL in one batch, and writes the result
  * back to the target language. Pages also get a slug derived from the
- * translated title.
+ * translated title. Which fields count: their type in the blueprints and
+ * the choice in the Project Wizard (see Fields).
  */
 final class Translator
 {
@@ -31,8 +32,12 @@ final class Translator
         'metakeywords',
     ];
 
+    /** A dry run: the texts that would go to DeepL (nothing is sent or written). */
+    public array $sent = [];
+
     public function __construct(
-        private readonly DeepL $deepl,
+        private readonly ?DeepL $deepl,
+        private readonly bool $dryRun = false,
     ) {
     }
 
@@ -50,6 +55,7 @@ final class Translator
 
         // ---- Blocks ----
         $blocks = null;
+        $reencode = [];
         /** @var list<array{path: list<int|string>, token: ?array, index: int}> $blockSlots */
         $blockSlots = [];
 
@@ -62,18 +68,53 @@ final class Translator
                 // Uniform array-tree — nested blocks become sub-arrays, not JSON strings.
                 BlockWalker::decodeAll($blocks);
 
+                // which fields: their type in the block's blueprint and the
+                // choice in the Project Wizard (Fields)
+                $reencode = [];
                 foreach (BlockWalker::collect($blocks) as $visit) {
-                    $value = $visit['value'];
-                    if (!is_string($value) || $value === '') continue;
+                    $fields = Fields::ofBlock($visit['type']);
+                    $field  = $visit['field'];
+                    $value  = $visit['value'];
 
-                    $decoded = PwtextCodec::decode($value);
-                    if (trim($decoded['text']) === '') continue;
-
-                    // Skip config tokens (single-word ascii like "large", "left",
-                    // "h2"). Real content usually has whitespace or non-ASCII.
-                    if ($decoded['token'] === null && !self::looksLikeSentence($decoded['text'])) {
+                    // a block without blueprint: only pagewizard's own text
+                    // fields (their JSON envelope says so)
+                    if ($fields === null) {
+                        if (!is_string($value) || $value === '') continue;
+                        $decoded = PwtextCodec::decode($value);
+                        if ($decoded['token'] === null || trim($decoded['text']) === '') continue;
+                        $blockSlots[] = ['path' => $visit['path'], 'token' => $decoded['token'], 'index' => count($texts)];
+                        $texts[]      = $decoded['text'];
                         continue;
                     }
+                    if (!isset($fields[$field])) continue;
+
+                    // a structure: its text columns, row by row
+                    if ($fields[$field]['type'] === 'structure') {
+                        $rows = is_string($value) ? json_decode($value, true) : $value;
+                        if (!is_array($rows) || !array_is_list($rows)) continue;
+                        if (is_string($value)) {
+                            BlockWalker::setByPath($blocks, $visit['path'], $rows);
+                            $reencode[] = $visit['path'];
+                        }
+                        foreach ($rows as $r => $row) {
+                            if (!is_array($row)) continue;
+                            foreach (array_keys($fields[$field]['columns']) as $col) {
+                                if (!Fields::enabled($visit['type'], $field . '.' . $col)) continue;
+                                $cell = $row[$col] ?? null;
+                                if (!is_string($cell) || trim($cell) === '') continue;
+                                $decoded = PwtextCodec::decode($cell);
+                                if (trim($decoded['text']) === '') continue;
+                                $blockSlots[] = ['path' => [...$visit['path'], $r, $col], 'token' => $decoded['token'], 'index' => count($texts)];
+                                $texts[]      = $decoded['text'];
+                            }
+                        }
+                        continue;
+                    }
+
+                    if (!Fields::enabled($visit['type'], $field)) continue;
+                    if (!is_string($value) || $value === '') continue;
+                    $decoded = PwtextCodec::decode($value);
+                    if (trim($decoded['text']) === '') continue;
 
                     $blockSlots[] = ['path' => $visit['path'], 'token' => $decoded['token'], 'index' => count($texts)];
                     $texts[]      = $decoded['text'];
@@ -85,6 +126,7 @@ final class Translator
         /** @var array<string, int> $fieldSlots field => index in $texts */
         $fieldSlots = [];
         foreach (self::TEXT_FIELDS as $field) {
+            if (!Fields::enabled('page', $field)) continue;
             $value = $sourceContent[$field] ?? null;
             if (!is_string($value) || trim($value) === '') continue;
 
@@ -96,6 +138,7 @@ final class Translator
         /** @var array<string, list<int>> $tagSlots field => indexes in $texts */
         $tagSlots = [];
         foreach (self::TAG_FIELDS as $field) {
+            if (!Fields::enabled('page', $field)) continue;
             $value = $sourceContent[$field] ?? null;
             if (!is_string($value)) continue;
 
@@ -104,6 +147,11 @@ final class Translator
                 $tagSlots[$field][] = count($texts);
                 $texts[]            = $tag;
             }
+        }
+
+        if ($this->dryRun || $this->deepl === null) {
+            $this->sent = $texts;
+            return count($texts);
         }
 
         $translated = $this->deepl->translate($texts, $target, $source);
@@ -115,6 +163,14 @@ final class Translator
             foreach ($blockSlots as $slot) {
                 $newValue = PwtextCodec::encode($result($slot['index']), $slot['token']);
                 BlockWalker::setByPath($blocks, $slot['path'], $newValue);
+            }
+
+            // (structures that came as JSON text go back as such)
+            foreach ($reencode as $path) {
+                BlockWalker::setByPath($blocks, $path, json_encode(
+                    BlockWalker::getByPath($blocks, $path),
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                ));
             }
 
             // Written even without translatable units, so target-language
@@ -161,19 +217,5 @@ final class Translator
         } catch (Throwable) {
             // keep current slug
         }
-    }
-
-    /**
-     * Heuristic: is $text likely a natural-language sentence (worth
-     * translating), or a config-token like "large" / "left" / "h2"?
-     *
-     * We look for whitespace or a non-ASCII character. That catches
-     * German diacritics ("Räume", "Übungen") and any phrase, while
-     * rejecting single-word config values.
-     */
-    private static function looksLikeSentence(string $text): bool
-    {
-        if (str_contains($text, ' ')) return true;
-        return preg_match('/[^\x00-\x7F]/u', $text) === 1;
     }
 }
