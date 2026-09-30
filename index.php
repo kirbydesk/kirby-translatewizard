@@ -55,7 +55,7 @@ function _translatewizard_actions($model): array
             $missing  += $exists ? 0 : 1;
             $actions[] = [
                 'label'    => tt('translatewizard.action.to', ['lang' => $language->name()]),
-                'icon'     => 'translatewizard-sparkles',
+                'icon'     => 'translatewizard-translate',
                 'dialog'   => 'translatewizard/to/' . $language->code() . '/' . $path,
                 'disabled' => $exists,
             ];
@@ -64,7 +64,7 @@ function _translatewizard_actions($model): array
             $actions[] = '-';
             $actions[] = [
                 'label'    => t('translatewizard.action.missing', 'Translate all missing languages'),
-                'icon'     => 'translatewizard-sparkles',
+                'icon'     => 'translatewizard-translate',
                 'dialog'   => 'translatewizard/to/missing/' . $path,
                 'disabled' => $missing === 0,
             ];
@@ -79,7 +79,7 @@ function _translatewizard_actions($model): array
     return [
         [
             'label'  => t('translatewizard.action.translate', 'Translate page with AI'),
-            'icon'   => 'translatewizard-sparkles',
+            'icon'   => 'translatewizard-translate',
             'dialog' => 'translatewizard/' . $path,
         ],
         [
