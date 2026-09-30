@@ -20,7 +20,7 @@ use Throwable;
  *
  *   {"fields": {"pwButton.arialabel": false, "page:article.metakeywords": false}}
  *
- * Start value: on – except fields holding ids (fragment, aria-describedby).
+ * Start value: on – except fields holding ids (fragment, the anchor).
  */
 final class Fields
 {
@@ -28,7 +28,7 @@ final class Fields
     public const TEXT_TYPES = ['text', 'textarea', 'writer', 'markdown', 'list', 'pwtext', 'pweditor', 'tags'];
 
     /** Text fields holding ids, never words: off unless switched on. */
-    private const OFF = ['fragment', 'ariadescribedby'];
+    private const OFF = ['fragment'];
 
     /** Kirby's own blocks: not part of pagewizard's pages. */
     private const CORE_BLOCKS = ['code', 'gallery', 'heading', 'image', 'line', 'list', 'markdown', 'quote', 'table', 'text', 'video'];

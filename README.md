@@ -13,7 +13,7 @@ textarea, writer, markdown, list, tags and pagewizard's `pwtext` /
 (its title and fields) and in the blocks of its blocks fields. Everything else – links,
 icons, options – is never sent. In the Project Wizard (**Settings →
 Translation**) each field can be switched off in a tree of the templates and blocks;
-fields holding ids (`fragment`, `ariadescribedby`) start switched off.
+fields holding ids (`fragment`, the anchor) start switched off.
 The choice is stored in `content/.projectwizard/translate.json`. The same
 page shows the DeepL account's usage.
 
