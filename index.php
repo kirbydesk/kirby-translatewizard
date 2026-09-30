@@ -229,6 +229,42 @@ Kirby::plugin('kirbydesk/translatewizard', [
                     return ['tree' => Fields::tree()];
                 },
             ],
+            // Translate several pages (Project Wizard › Translation): the
+            // secondary languages and, per language, the pages – with or
+            // without a translation – and the characters each would cost
+            // (a dry run: nothing is sent); translated then page by page
+            // through (:all)/translatewizard/translate
+            [
+                'pattern' => 'translatewizard/batch',
+                'method'  => 'GET',
+                'action'  => function () {
+                    $kirby = App::instance();
+                    $default = $kirby->defaultLanguage();
+                    if ($default === null) return ['languages' => [], 'pages' => []];
+                    $languages = [];
+                    foreach ($kirby->languages() as $language) {
+                        if ($language->code() === $default->code()) continue;
+                        $languages[] = ['code' => $language->code(), 'name' => $language->name()];
+                    }
+                    $pages = [];
+                    foreach ($kirby->site()->index(true) as $page) {
+                        $translator = new Translator(null, true);
+                        $translator->translatePage($page, $default->code(), $default->code());
+                        $chars = array_sum(array_map(fn ($t) => mb_strlen(strip_tags((string) $t)), $translator->sent));
+                        $translated = [];
+                        foreach ($languages as $language) {
+                            $translated[$language['code']] = $page->version('latest')->exists($language['code']);
+                        }
+                        $pages[] = [
+                            'path'       => $page->panel()->path(),
+                            'title'      => $page->title()->value(),
+                            'chars'      => $chars,
+                            'translated' => $translated,
+                        ];
+                    }
+                    return ['languages' => $languages, 'pages' => $pages];
+                },
+            ],
             // the DeepL account's usage this period (characters, limit);
             // null without key or when DeepL does not answer
             [
