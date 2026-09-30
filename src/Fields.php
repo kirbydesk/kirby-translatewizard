@@ -157,11 +157,22 @@ final class Fields
             'children' => $templates,
         ]];
         // the blocks, each with its text fields and nested blocks
+        // (alphabetical, as the templates; those in several blocks, such as
+        // the button, after them)
         $blocks = [];
-        foreach ([...$roots, ...$shared] as $type) {
+        $sharedNodes = [];
+        foreach ($roots as $type) {
             $n = $node($type);
             if ($n) $blocks[] = $n;
         }
+        foreach ($shared as $type) {
+            $n = $node($type);
+            if ($n) $sharedNodes[] = $n;
+        }
+        $byLabel = fn ($a, $b) => strcasecmp($a['label'], $b['label']);
+        usort($blocks, $byLabel);
+        usort($sharedNodes, $byLabel);
+        $blocks = [...$blocks, ...$sharedNodes];
         $tree[] = [
             'key'      => 'blocks',
             'code'     => null,
