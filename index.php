@@ -305,6 +305,15 @@ Kirby::plugin('kirbydesk/translatewizard', [
                         throw new InvalidArgumentException(message: 'Source and target language must differ.');
                     }
 
+                    // a dry run (simulate: true): the page gone through as for
+                    // a translation, nothing sent to DeepL, nothing written –
+                    // a short pause, as a real request would take
+                    if (!empty($body['simulate'])) {
+                        $units = (new Translator(null, true))->translatePage($model, $source, $target);
+                        usleep(600000);
+                        return ['status' => 'ok', 'units' => $units, 'from' => $source, 'to' => $target, 'simulated' => true];
+                    }
+
                     $apiKey = _translatewizard_apiKey($kirby);
                     if ($apiKey === null) {
                         throw new InvalidArgumentException(message: 'No DeepL API key configured.');
