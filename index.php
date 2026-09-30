@@ -74,6 +74,11 @@ Kirby::plugin('kirbydesk/translatewizard', [
                 'option' => 'deepl.apiKey',
                 'label'  => t('translatewizard.secret.deepl', 'DeepL API key'),
                 'help'   => t('translatewizard.secret.deepl.help', 'For “Translate page with AI”. Keys ending in :fx use DeepL Free.'),
+                // valid: DeepL answers the usage request
+                'check'  => fn (string $key): bool => pwSecrets::httpCheck(
+                    str_ends_with($key, ':fx') ? 'https://api-free.deepl.com/v2/usage' : 'https://api.deepl.com/v2/usage',
+                    ['Authorization: DeepL-Auth-Key ' . $key]
+                ),
             ],
         ],
     ],
