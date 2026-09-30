@@ -91,8 +91,10 @@ Kirby::plugin('kirbydesk/translatewizard', [
                             'icon'     => 'translatewizard-translate',
                             'title'    => t('translatewizard.button', 'Translation'),
                             'options'  => $actions,
-                            // (the arrow: it opens a menu)
+                            // the arrow: it opens a menu (Kirby draws it only
+                            // next to a text – an invisible one here)
                             'dropdown' => true,
+                            'text'     => "\u{200B}",
                         ];
                     },
                 ],
