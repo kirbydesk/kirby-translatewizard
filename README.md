@@ -7,6 +7,15 @@ config untouched. Walks Blocks recursively so nested items
 (`pwsteplistitem`, `pwcardletsitem`, `pwfeaturelistitem`, `pwButton`, …)
 are translated too.
 
+Which fields are translated follows their type in the blueprints: text,
+textarea, writer, markdown, list, tags and pagewizard's `pwtext` /
+`pweditor` (a structure with its text columns). Everything else – links,
+icons, options – is never sent. In the Project Wizard (**Settings →
+Translation**) each field can be switched off in a tree of the blocks;
+fields holding ids (`fragment`, `ariadescribedby`) start switched off.
+The choice is stored in `content/.projectwizard/translate.json`. The same
+page shows the DeepL account's usage.
+
 Besides the Blocks field, the page title and pagewizard's meta fields
 (`metapagetitle`, `metanavigationtitle`, `metateaser`,
 `metadescription`, `metakeywords`) are translated as well. On the first
