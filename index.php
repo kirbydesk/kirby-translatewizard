@@ -223,11 +223,7 @@ Kirby::plugin('kirbydesk/translatewizard', [
                             $source  = $kirby->defaultLanguage()->code();
                             $targets = _translatewizard_targets($to, $model);
                             $chars   = _translatewizard_chars($model, $source) * count($targets);
-                            $names   = implode(', ', array_map(fn ($l) => $l->name(), $targets));
-                            // (several languages: "the missing languages", not a list)
-                            $text    = count($targets) > 1
-                                ? tt('translatewizard.dialog.chars.missing', ['chars' => number_format($chars, 0, ',', '.')])
-                                : tt('translatewizard.dialog.chars', ['chars' => number_format($chars, 0, ',', '.'), 'lang' => $names]);
+                            $text    = tt('translatewizard.dialog.chars', ['chars' => number_format($chars, 0, ',', '.')]);
 
                             return [
                                 'component' => 'k-text-dialog',
