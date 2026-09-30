@@ -10,13 +10,14 @@ use Throwable;
 /**
  * Which fields are translated. The candidates come from the blueprints:
  * every field of a text type (text, textarea, writer, markdown, list and
- * pagewizard's pwtext / pweditor), in the blocks and on the page (title,
- * meta fields); a structure field counts with its text columns. Each can
+ * pagewizard's pwtext / pweditor), in the blocks and in the page
+ * templates (their title and fields); a structure field counts with its
+ * text columns. Each can
  * be switched off in the Project Wizard (Settings › Translation); the
  * choice lives in the project's content/.projectwizard/translate.json,
  * as the differences from the start values:
  *
- *   {"fields": {"pwButton.arialabel": false, "page.metakeywords": false}}
+ *   {"fields": {"pwButton.arialabel": false, "page:article.metakeywords": false}}
  *
  * Start value: on – except fields holding ids (fragment, aria-describedby).
  */
@@ -31,18 +32,11 @@ final class Fields
     /** Kirby's own blocks: not part of pagewizard's pages. */
     private const CORE_BLOCKS = ['code', 'gallery', 'heading', 'image', 'line', 'list', 'markdown', 'quote', 'table', 'text', 'video'];
 
-    /** The page's own fields (Translator::TEXT_FIELDS / TAG_FIELDS). */
-    public const PAGE_FIELDS = [
-        'title'               => 'text',
-        'metapagetitle'       => 'text',
-        'metanavigationtitle' => 'text',
-        'metateaser'          => 'textarea',
-        'metadescription'     => 'textarea',
-        'metakeywords'        => 'tags',
-    ];
-
     /** @var array<string, array<string, array>>|null block type => field => props */
     private static ?array $blockFields = null;
+
+    /** @var array<string, array>|null page template => label, icon, fields */
+    private static ?array $pageFields = null;
 
     private static ?array $stored = null;
 
@@ -67,25 +61,36 @@ final class Fields
     public static function ofBlock(string $type): ?array
     {
         $all = self::blockFields();
-        if (!isset($all[$type])) return null;
-        $out = [];
-        foreach ($all[$type]['fields'] as $name => $props) {
-            $fieldType = $props['type'] ?? '';
-            if (in_array($fieldType, self::TEXT_TYPES, true)) {
-                $out[$name] = ['type' => $fieldType, 'label' => self::label($props['label'] ?? null, $name)];
-            } elseif ($fieldType === 'structure') {
-                $columns = [];
-                foreach (self::fieldsOf($props) as $col => $colProps) {
-                    if (in_array($colProps['type'] ?? '', self::TEXT_TYPES, true)) {
-                        $columns[$col] = ['type' => $colProps['type'], 'label' => self::label($colProps['label'] ?? null, $col)];
-                    }
-                }
-                if ($columns) {
-                    $out[$name] = ['type' => 'structure', 'label' => self::label($props['label'] ?? null, $name), 'columns' => $columns];
-                }
-            }
-        }
-        return $out;
+        return isset($all[$type]) ? self::textFields($all[$type]['fields']) : null;
+    }
+
+    /**
+     * The text fields of a page template: its title first, then those of
+     * its blueprint. Null for a template without blueprint.
+     *
+     * @return array<string, array{type: string, label: string, columns?: array}>|null
+     */
+    public static function ofPage(string $template): ?array
+    {
+        $all = self::pageFields();
+        if (!isset($all[$template])) return null;
+        return [
+            'title' => ['type' => 'text', 'label' => (string) I18n::translate('title', 'Title')],
+            ...self::textFields($all[$template]['fields']),
+        ];
+    }
+
+    /**
+     * The blocks fields of a page template (their names), walked block by
+     * block. Without blueprint: pagewizard's "blocks".
+     *
+     * @return list<string>
+     */
+    public static function blocksOfPage(string $template): array
+    {
+        $all = self::pageFields();
+        if (!isset($all[$template])) return ['blocks'];
+        return array_keys(array_filter($all[$template]['fields'], fn ($p) => ($p['type'] ?? '') === 'blocks'));
     }
 
     /**
@@ -122,6 +127,7 @@ final class Fields
             if (!$fields && !$children) return null;
             return [
                 'key'      => $type,
+                'code'     => $type,
                 'label'    => $all[$type]['label'],
                 'icon'     => $all[$type]['icon'],
                 'fields'   => $fields,
@@ -129,16 +135,26 @@ final class Fields
             ];
         };
 
-        $pageFields = [];
-        foreach (self::PAGE_FIELDS as $name => $fieldType) {
-            $pageFields[$name] = ['type' => $fieldType, 'label' => self::pageLabel($name)];
+        // the page templates, each with its title and text fields
+        $templates = [];
+        foreach (self::pageFields() as $template => $info) {
+            $templates[] = [
+                'key'      => 'page:' . $template,
+                'code'     => $template,
+                'label'    => $info['label'],
+                'icon'     => $info['icon'],
+                'fields'   => self::nodeFields('page:' . $template, self::ofPage($template) ?? []),
+                'children' => [],
+            ];
         }
+        usort($templates, fn ($a, $b) => strcasecmp($a['label'], $b['label']));
         $tree = [[
-            'key'      => 'page',
-            'label'    => I18n::translate('translatewizard.fields.page', 'Page'),
-            'icon'     => 'page',
-            'fields'   => self::nodeFields('page', $pageFields),
-            'children' => [],
+            'key'      => 'templates',
+            'code'     => null,
+            'label'    => (string) I18n::translate('translatewizard.fields.templates', 'Templates'),
+            'icon'     => 'template',
+            'fields'   => [],
+            'children' => $templates,
         ]];
         foreach ([...$roots, ...$shared] as $type) {
             $n = $node($type);
@@ -173,6 +189,53 @@ final class Fields
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * Of a blueprint's fields those holding text (by type), a structure
+     * with its text columns.
+     */
+    private static function textFields(array $fields): array
+    {
+        $out = [];
+        foreach ($fields as $name => $props) {
+            $fieldType = $props['type'] ?? '';
+            if (in_array($fieldType, self::TEXT_TYPES, true)) {
+                $out[$name] = ['type' => $fieldType, 'label' => self::label($props['label'] ?? null, $name)];
+            } elseif ($fieldType === 'structure') {
+                $columns = [];
+                foreach (self::fieldsOf($props) as $col => $colProps) {
+                    if (in_array($colProps['type'] ?? '', self::TEXT_TYPES, true)) {
+                        $columns[$col] = ['type' => $colProps['type'], 'label' => self::label($colProps['label'] ?? null, $col)];
+                    }
+                }
+                if ($columns) {
+                    $out[$name] = ['type' => 'structure', 'label' => self::label($props['label'] ?? null, $name), 'columns' => $columns];
+                }
+            }
+        }
+        return $out;
+    }
+
+    /** @return array<string, array{label: string, icon: string, fields: array}> */
+    private static function pageFields(): array
+    {
+        if (self::$pageFields !== null) return self::$pageFields;
+        $out = [];
+        foreach (App::instance()->blueprints('pages') as $template) {
+            try {
+                $bp = Blueprint::find('pages/' . $template);
+            } catch (Throwable) {
+                continue;
+            }
+            if (!is_array($bp)) continue;
+            $out[$template] = [
+                'label'  => self::label($bp['title'] ?? null, $template),
+                'icon'   => is_string($bp['icon'] ?? null) ? $bp['icon'] : 'page',
+                'fields' => self::fieldsOf($bp),
+            ];
+        }
+        return self::$pageFields = $out;
+    }
 
     /** A node's fields for the tree: key, label, type, on/off. */
     private static function nodeFields(string $owner, array $fields): array
@@ -261,11 +324,6 @@ final class Fields
         if (is_array($label)) return (string) (I18n::translate($label) ?? $fallback);
         if (is_string($label) && $label !== '') return (string) I18n::translate($label, $label);
         return $fallback;
-    }
-
-    private static function pageLabel(string $name): string
-    {
-        return (string) I18n::translate('translatewizard.fields.' . $name, $name);
     }
 
     private static function stored(): array

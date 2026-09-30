@@ -1,12 +1,6 @@
 <?php return [
 
-	'translatewizard.fields.page' => 'Seite',
-	'translatewizard.fields.title' => 'Titel',
-	'translatewizard.fields.metapagetitle' => 'Seitentitel (SEO)',
-	'translatewizard.fields.metanavigationtitle' => 'Navigationstitel',
-	'translatewizard.fields.metateaser' => 'Teaser',
-	'translatewizard.fields.metadescription' => 'Beschreibung (SEO)',
-	'translatewizard.fields.metakeywords' => 'Schlüsselwörter',
+	'translatewizard.fields.templates' => 'Templates',
 	'translatewizard.button' => 'Übersetzung',
 	'translatewizard.action.translate' => 'Seite mit KI übersetzen',
 	'translatewizard.action.restore' => 'Originalsprache wiederherstellen',

@@ -9,31 +9,20 @@ use Throwable;
 
 /**
  * Translates a page between two languages. Reads the source-language
- * content, collects translatable payloads — the Blocks field (walked
- * recursively into nested blocks / buttons), the title and pagewizard's
- * meta fields — hands them to DeepL in one batch, and writes the result
- * back to the target language. Pages also get a slug derived from the
- * translated title. Which fields count: their type in the blueprints and
- * the choice in the Project Wizard (see Fields).
+ * content, collects the translatable texts – the text fields of the
+ * page's template (title, meta fields …) and its blocks fields, walked
+ * recursively into nested blocks / buttons – hands them to DeepL in one
+ * batch, and writes the result back to the target language. Pages also
+ * get a slug derived from the translated title. Which fields count: their
+ * type in the blueprints and the choice in the Project Wizard (Fields).
  */
 final class Translator
 {
-    /** Plain text fields, translated as a whole. */
-    private const TEXT_FIELDS = [
-        'title',
-        'metapagetitle',
-        'metanavigationtitle',
-        'metateaser',
-        'metadescription',
-    ];
-
-    /** Tags fields (comma-separated), translated tag by tag. */
-    private const TAG_FIELDS = [
-        'metakeywords',
-    ];
-
     /** A dry run: the texts that would go to DeepL (nothing is sent or written). */
     public array $sent = [];
+
+    /** @var list<string> */
+    private array $texts = [];
 
     public function __construct(
         private readonly ?DeepL $deepl,
@@ -48,154 +37,170 @@ final class Translator
      */
     public function translatePage(Page|Site $page, string $source, string $target): int
     {
-        $sourceContent = $page->content($source)->toArray();
+        $content  = $page->content($source)->toArray();
+        $template = $page instanceof Page ? $page->intendedTemplate()->name() : null;
+        $owner    = 'page:' . ($template ?? 'site');
+        $this->texts = [];
 
-        /** @var list<string> $texts */
-        $texts = [];
-
-        // ---- Blocks ----
-        $blocks = null;
-        $reencode = [];
-        /** @var list<array{path: list<int|string>, token: ?array, index: int}> $blockSlots */
-        $blockSlots = [];
-
-        $blocksRaw = $sourceContent['blocks'] ?? null;
-        if (is_string($blocksRaw)) {
-            $decodedBlocks = Data::decode($blocksRaw, 'json');
-            if (is_array($decodedBlocks) && $decodedBlocks !== []) {
-                $blocks = $decodedBlocks;
-
-                // Uniform array-tree — nested blocks become sub-arrays, not JSON strings.
-                BlockWalker::decodeAll($blocks);
-
-                // which fields: their type in the block's blueprint and the
-                // choice in the Project Wizard (Fields)
-                $reencode = [];
-                foreach (BlockWalker::collect($blocks) as $visit) {
-                    $fields = Fields::ofBlock($visit['type']);
-                    $field  = $visit['field'];
-                    $value  = $visit['value'];
-
-                    // a block without blueprint: only pagewizard's own text
-                    // fields (their JSON envelope says so)
-                    if ($fields === null) {
-                        if (!is_string($value) || $value === '') continue;
-                        $decoded = PwtextCodec::decode($value);
-                        if ($decoded['token'] === null || trim($decoded['text']) === '') continue;
-                        $blockSlots[] = ['path' => $visit['path'], 'token' => $decoded['token'], 'index' => count($texts)];
-                        $texts[]      = $decoded['text'];
-                        continue;
-                    }
-                    if (!isset($fields[$field])) continue;
-
-                    // a structure: its text columns, row by row
-                    if ($fields[$field]['type'] === 'structure') {
-                        $rows = is_string($value) ? json_decode($value, true) : $value;
-                        if (!is_array($rows) || !array_is_list($rows)) continue;
-                        if (is_string($value)) {
-                            BlockWalker::setByPath($blocks, $visit['path'], $rows);
-                            $reencode[] = $visit['path'];
-                        }
-                        foreach ($rows as $r => $row) {
-                            if (!is_array($row)) continue;
-                            foreach (array_keys($fields[$field]['columns']) as $col) {
-                                if (!Fields::enabled($visit['type'], $field . '.' . $col)) continue;
-                                $cell = $row[$col] ?? null;
-                                if (!is_string($cell) || trim($cell) === '') continue;
-                                $decoded = PwtextCodec::decode($cell);
-                                if (trim($decoded['text']) === '') continue;
-                                $blockSlots[] = ['path' => [...$visit['path'], $r, $col], 'token' => $decoded['token'], 'index' => count($texts)];
-                                $texts[]      = $decoded['text'];
-                            }
-                        }
-                        continue;
-                    }
-
-                    if (!Fields::enabled($visit['type'], $field)) continue;
-                    if (!is_string($value) || $value === '') continue;
-                    $decoded = PwtextCodec::decode($value);
-                    if (trim($decoded['text']) === '') continue;
-
-                    $blockSlots[] = ['path' => $visit['path'], 'token' => $decoded['token'], 'index' => count($texts)];
-                    $texts[]      = $decoded['text'];
-                }
-            }
-        }
-
-        // ---- Title + meta text fields ----
-        /** @var array<string, int> $fieldSlots field => index in $texts */
+        // ---- the template's text fields (title, meta fields …) ----
+        $own = ($template !== null ? Fields::ofPage($template) : null) ?? ['title' => ['type' => 'text']];
+        /** @var array<string, array> $fieldSlots field => slot(s) */
         $fieldSlots = [];
-        foreach (self::TEXT_FIELDS as $field) {
-            if (!Fields::enabled('page', $field)) continue;
-            $value = $sourceContent[$field] ?? null;
-            if (!is_string($value) || trim($value) === '') continue;
-
-            $fieldSlots[$field] = count($texts);
-            $texts[]            = $value;
+        /** @var array<string, array> $rowsOf a structure field's decoded rows */
+        $rowsOf = [];
+        foreach ($own as $field => $props) {
+            $value = $content[$field] ?? null;
+            if ($props['type'] === 'structure') {
+                $rows = is_string($value) ? Data::decode($value, 'yaml') : $value;
+                if (!is_array($rows) || !array_is_list($rows)) continue;
+                $slots = [];
+                foreach ($rows as $r => $row) {
+                    foreach (array_keys($props['columns']) as $col) {
+                        if (!Fields::enabled($owner, $field . '.' . $col)) continue;
+                        $slot = $this->add($row[$col] ?? null);
+                        if ($slot) $slots[] = [...$slot, 'path' => [$r, $col]];
+                    }
+                }
+                if ($slots) {
+                    $rowsOf[$field] = $rows;
+                    $fieldSlots[$field] = ['kind' => 'structure', 'slots' => $slots];
+                }
+                continue;
+            }
+            if (!Fields::enabled($owner, $field) || !is_string($value)) continue;
+            // tags: tag by tag
+            if ($props['type'] === 'tags') {
+                $tags = array_values(array_filter(array_map('trim', explode(',', $value)), fn ($t) => $t !== ''));
+                $slots = array_values(array_filter(array_map(fn ($t) => $this->add($t), $tags)));
+                if ($slots) $fieldSlots[$field] = ['kind' => 'tags', 'slots' => $slots];
+                continue;
+            }
+            $slot = $this->add($value);
+            if ($slot) $fieldSlots[$field] = ['kind' => 'text', 'slots' => [$slot]];
         }
 
-        // ---- Tags fields ----
-        /** @var array<string, list<int>> $tagSlots field => indexes in $texts */
-        $tagSlots = [];
-        foreach (self::TAG_FIELDS as $field) {
-            if (!Fields::enabled('page', $field)) continue;
-            $value = $sourceContent[$field] ?? null;
-            if (!is_string($value)) continue;
-
-            $tags = array_values(array_filter(array_map('trim', explode(',', $value)), fn ($t) => $t !== ''));
-            foreach ($tags as $tag) {
-                $tagSlots[$field][] = count($texts);
-                $texts[]            = $tag;
-            }
+        // ---- the blocks fields ----
+        /** @var array<string, array{blocks: array, slots: list<array>, reencode: list<array>}> $trees */
+        $trees = [];
+        foreach ($template !== null ? Fields::blocksOfPage($template) : ['blocks'] as $field) {
+            $raw = $content[$field] ?? null;
+            if (!is_string($raw)) continue;
+            $blocks = Data::decode($raw, 'json');
+            if (!is_array($blocks) || $blocks === []) continue;
+            // (uniform array-tree – nested blocks become sub-arrays, not JSON strings)
+            BlockWalker::decodeAll($blocks);
+            $trees[$field] = ['blocks' => $blocks, 'slots' => [], 'reencode' => []];
+            $this->collectBlocks($trees[$field]);
         }
 
         if ($this->dryRun || $this->deepl === null) {
-            $this->sent = $texts;
-            return count($texts);
+            $this->sent = $this->texts;
+            return count($this->texts);
         }
 
-        $translated = $this->deepl->translate($texts, $target, $source);
-        $result     = fn (int $i) => $translated[$i] ?? $texts[$i];
+        $translated = $this->texts === [] ? [] : $this->deepl->translate($this->texts, $target, $source);
+        $result = fn (array $slot) => PwtextCodec::encode($translated[$slot['index']] ?? $this->texts[$slot['index']], $slot['token']);
 
         $update = [];
-
-        if ($blocks !== null) {
-            foreach ($blockSlots as $slot) {
-                $newValue = PwtextCodec::encode($result($slot['index']), $slot['token']);
-                BlockWalker::setByPath($blocks, $slot['path'], $newValue);
+        foreach ($fieldSlots as $field => $entry) {
+            if ($entry['kind'] === 'text') {
+                $update[$field] = $result($entry['slots'][0]);
+            } elseif ($entry['kind'] === 'tags') {
+                $update[$field] = implode(', ', array_map($result, $entry['slots']));
+            } else {
+                $rows = $rowsOf[$field];
+                foreach ($entry['slots'] as $slot) {
+                    $rows[$slot['path'][0]][$slot['path'][1]] = $result($slot);
+                }
+                $update[$field] = Data::encode($rows, 'yaml');
             }
+        }
 
+        foreach ($trees as $field => $tree) {
+            $blocks = $tree['blocks'];
+            foreach ($tree['slots'] as $slot) {
+                BlockWalker::setByPath($blocks, $slot['path'], $result($slot));
+            }
             // (structures that came as JSON text go back as such)
-            foreach ($reencode as $path) {
+            foreach ($tree['reencode'] as $path) {
                 BlockWalker::setByPath($blocks, $path, json_encode(
                     BlockWalker::getByPath($blocks, $path),
                     JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
                 ));
             }
-
-            // Written even without translatable units, so target-language
-            // content mirrors the source-language block structure.
+            // written even without translatable units, so the target
+            // language mirrors the source language's block structure
             BlockWalker::encodeAll($blocks);
-            $update['blocks'] = json_encode($blocks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        }
-
-        foreach ($fieldSlots as $field => $index) {
-            $update[$field] = $result($index);
-        }
-
-        foreach ($tagSlots as $field => $indexes) {
-            $update[$field] = implode(', ', array_map($result, $indexes));
+            $update[$field] = json_encode($blocks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
 
         if ($update !== []) {
             $page = $page->update($update, $target);
         }
 
-        if (isset($fieldSlots['title'])) {
-            $this->translateSlug($page, $result($fieldSlots['title']), $target);
+        if (isset($update['title'])) {
+            $this->translateSlug($page, $update['title'], $target);
         }
 
-        return count($texts);
+        return count($this->texts);
+    }
+
+    /**
+     * A text for DeepL: its slot (index, codec token), or null when there
+     * is nothing to translate.
+     */
+    private function add(mixed $value): ?array
+    {
+        if (!is_string($value) || trim($value) === '') return null;
+        $decoded = PwtextCodec::decode($value);
+        if (trim($decoded['text']) === '') return null;
+        $this->texts[] = $decoded['text'];
+        return ['index' => count($this->texts) - 1, 'token' => $decoded['token']];
+    }
+
+    /**
+     * The texts of a blocks field: per block its text fields by the
+     * block's blueprint and the choice (Fields), a structure column by
+     * column; a block without blueprint only with pagewizard's own text
+     * fields (their JSON envelope says so).
+     */
+    private function collectBlocks(array &$tree): void
+    {
+        foreach (BlockWalker::collect($tree['blocks']) as $visit) {
+            $fields = Fields::ofBlock($visit['type']);
+            $field  = $visit['field'];
+            $value  = $visit['value'];
+
+            if ($fields === null) {
+                if (!is_string($value) || PwtextCodec::decode($value)['token'] === null) continue;
+                $slot = $this->add($value);
+                if ($slot) $tree['slots'][] = [...$slot, 'path' => $visit['path']];
+                continue;
+            }
+            if (!isset($fields[$field])) continue;
+
+            if ($fields[$field]['type'] === 'structure') {
+                $rows = is_string($value) ? json_decode($value, true) : $value;
+                if (!is_array($rows) || !array_is_list($rows)) continue;
+                if (is_string($value)) {
+                    BlockWalker::setByPath($tree['blocks'], $visit['path'], $rows);
+                    $tree['reencode'][] = $visit['path'];
+                }
+                foreach ($rows as $r => $row) {
+                    if (!is_array($row)) continue;
+                    foreach (array_keys($fields[$field]['columns']) as $col) {
+                        if (!Fields::enabled($visit['type'], $field . '.' . $col)) continue;
+                        $slot = $this->add($row[$col] ?? null);
+                        if ($slot) $tree['slots'][] = [...$slot, 'path' => [...$visit['path'], $r, $col]];
+                    }
+                }
+                continue;
+            }
+
+            if (!Fields::enabled($visit['type'], $field)) continue;
+            $slot = $this->add($value);
+            if ($slot) $tree['slots'][] = [...$slot, 'path' => $visit['path']];
+        }
     }
 
     /**
