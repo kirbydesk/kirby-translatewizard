@@ -144,7 +144,9 @@ final class Fields
             if (!$fields && !$children) return null;
             return [
                 'key'      => $type,
-                'code'     => $type,
+                // (the block type: as the row's tooltip)
+                'code'     => null,
+                'title'    => $type,
                 'label'    => $all[$type]['label'],
                 'icon'     => $all[$type]['icon'],
                 'fields'   => $fields,
