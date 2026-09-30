@@ -88,13 +88,9 @@ Kirby::plugin('kirbydesk/translatewizard', [
                         $actions = _translatewizard_actions($model);
                         if ($actions === []) return null;
                         return [
-                            'icon'     => 'translatewizard-translate',
-                            'title'    => t('translatewizard.button', 'Translation'),
-                            'options'  => $actions,
-                            // the arrow: it opens a menu (Kirby draws it only
-                            // next to a text – an invisible one here)
-                            'dropdown' => true,
-                            'text'     => "\u{200B}",
+                            'icon'    => 'translatewizard-translate',
+                            'title'   => t('translatewizard.button', 'Translation'),
+                            'options' => $actions,
                         ];
                     },
                 ],
