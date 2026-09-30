@@ -5,6 +5,7 @@ namespace Kirbydesk\Translatewizard;
 use Kirby\Cms\App;
 use Kirby\Cms\Blueprint;
 use Kirby\Toolkit\I18n;
+use Kirby\Toolkit\Str;
 use Throwable;
 
 /**
@@ -147,7 +148,7 @@ final class Fields
                 'children' => [],
             ];
         }
-        usort($templates, fn ($a, $b) => strcasecmp($a['label'], $b['label']));
+        usort($templates, fn ($a, $b) => strcasecmp(Str::ascii($a['label']), Str::ascii($b['label'])));
         $tree = [[
             'key'      => 'templates',
             'code'     => null,
@@ -169,7 +170,7 @@ final class Fields
             $n = $node($type);
             if ($n) $sharedNodes[] = $n;
         }
-        $byLabel = fn ($a, $b) => strcasecmp($a['label'], $b['label']);
+        $byLabel = fn ($a, $b) => strcasecmp(Str::ascii($a['label']), Str::ascii($b['label']));
         usort($blocks, $byLabel);
         usort($sharedNodes, $byLabel);
         $blocks = [...$blocks, ...$sharedNodes];
