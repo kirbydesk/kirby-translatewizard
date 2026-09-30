@@ -9,7 +9,7 @@
 	'translatewizard.action.to' => 'Übersetzen in: {lang}',
 	'translatewizard.action.missing' => 'Alle fehlenden Sprachen übersetzen',
 	'translatewizard.dialog.chars' => 'Es werden ~{chars} Zeichen zum Übersetzen in die Sprache {lang} an DeepL geschickt.',
-	'translatewizard.dialog.chars.missing' => 'Es werden ~{chars} Zeichen zum Übersetzen in die fehlenden Sprachen an DeepL geschickt.',
+	'translatewizard.dialog.chars.missing' => 'Es werden ~{chars} Zeichen zum Übersetzen an DeepL geschickt.',
 	'translatewizard.result.to' => 'Nach {lang} übersetzt ({units} Felder).',
 	'translatewizard.dialog.submit'  => 'Übersetzen',
 	'translatewizard.dialog.confirm' => 'Soll die Seite in {lang} übersetzt werden?',

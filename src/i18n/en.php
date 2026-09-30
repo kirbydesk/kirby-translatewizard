@@ -9,7 +9,7 @@
 	'translatewizard.action.to' => 'Translate into: {lang}',
 	'translatewizard.action.missing' => 'Translate all missing languages',
 	'translatewizard.dialog.chars' => '~{chars} characters are sent to DeepL for the translation into the language {lang}.',
-	'translatewizard.dialog.chars.missing' => '~{chars} characters are sent to DeepL for the translation into the missing languages.',
+	'translatewizard.dialog.chars.missing' => '~{chars} characters are sent to DeepL for the translation.',
 	'translatewizard.result.to' => 'Translated into {lang} ({units} fields).',
 	'translatewizard.dialog.submit'  => 'Translate',
 	'translatewizard.dialog.confirm' => 'Translate this page into {lang}?',
