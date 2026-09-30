@@ -141,7 +141,9 @@ final class Fields
         foreach (self::pageFields() as $template => $info) {
             $templates[] = [
                 'key'      => 'page:' . $template,
-                'code'     => $template,
+                // (the template's file name: as the row's tooltip)
+                'code'     => null,
+                'title'    => $template,
                 'label'    => $info['label'],
                 'icon'     => $info['icon'],
                 'fields'   => self::nodeFields('page:' . $template, self::ofPage($template) ?? []),
