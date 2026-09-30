@@ -4,6 +4,7 @@ use Kirby\Cms\App;
 use Kirby\Cms\Find;
 use Kirby\Exception\InvalidArgumentException;
 use Kirby\Exception\PermissionException;
+use Kirby\Toolkit\Escape;
 use Kirbydesk\Translatewizard\DeepL;
 use Kirbydesk\Translatewizard\Fields;
 use Kirbydesk\Translatewizard\Translator;
@@ -72,21 +73,22 @@ function _translatewizard_actions($model): array
         return $actions;
     }
 
-    // Restore only makes sense once the language's
-    // content file (e.g. *.en.txt) exists.
+    // a secondary language: translate while there is no translation yet,
+    // delete it once there is one (the other entry greyed out)
     $hasTranslation = $model->version('latest')->exists($current);
 
     return [
         [
-            'label'  => t('translatewizard.action.translate', 'Translate page with AI'),
-            'icon'   => 'translatewizard-translate',
-            'dialog' => 'translatewizard/' . $path,
+            'label'    => t('translatewizard.action.translate', 'Translate page'),
+            'icon'     => 'translatewizard-translate',
+            'dialog'   => 'translatewizard/' . $path,
+            'disabled' => $hasTranslation,
         ],
         [
-            'label'    => t('translatewizard.action.restore', 'Restore original language'),
-            'icon'     => 'refresh',
-            'dialog'   => 'translatewizard/reset/' . $path,
-            'disabled' => $hasTranslation === false,
+            'label'    => t('translatewizard.action.delete', 'Delete translation'),
+            'icon'     => 'trash',
+            'dialog'   => 'translatewizard/delete/' . $path,
+            'disabled' => !$hasTranslation,
         ],
     ];
 }
@@ -165,20 +167,22 @@ Kirby::plugin('kirbydesk/translatewizard', [
                     },
                 ],
                 'dialogs' => [
-                    'translatewizard/reset/(:all)' => [
+                    // a secondary language: its translation deleted – the page
+                    // shows the original language's content again (its own
+                    // slug goes with it)
+                    'translatewizard/delete/(:all)' => [
                         'load' => function (string $path) {
-                            $kirby   = App::instance();
-                            $default = $kirby->defaultLanguage();
+                            $kirby = App::instance();
                             return [
                                 'component' => 'k-text-dialog',
                                 'props' => [
                                     'submitButton' => [
-                                        'text'  => t('translatewizard.reset.submit', 'Restore'),
+                                        'text'  => t('translatewizard.delete.submit', 'Delete'),
                                         'theme' => 'negative',
-                                        'icon'  => 'refresh',
+                                        'icon'  => 'trash',
                                     ],
-                                    'text'  => tt('translatewizard.reset.confirm', 'Restore this language version to the {lang} original? Content in the current language will be overwritten.', [
-                                        'lang' => $default->name(),
+                                    'text' => tt('translatewizard.delete.confirm', [
+                                        'lang' => '<strong>' . Escape::html($kirby->language()->name()) . '</strong>',
                                     ]),
                                 ],
                             ];
@@ -190,29 +194,21 @@ Kirby::plugin('kirbydesk/translatewizard', [
                             if ($model->permissions()->can('update') === false) {
                                 throw new PermissionException(message: 'Not allowed.');
                             }
-
-                            $source = $kirby->defaultLanguage()->code();
-                            $target = $kirby->language()->code();
-                            if ($source === $target) {
-                                throw new InvalidArgumentException(message: 'Cannot reset the default language onto itself.');
+                            $language = $kirby->language();
+                            if ($language === null || $language->isDefault()) {
+                                throw new InvalidArgumentException(message: 'The original language cannot be deleted.');
                             }
 
-                            // Copy every content field from the default
-                            // language onto the current language.
-                            $defaultContent = $model->content($source)->toArray();
-                            $model = $model->update($defaultContent, $target);
-
-                            // Drop the translated slug — a slug equal to
-                            // the folder name is removed from the text file.
-                            if ($model instanceof \Kirby\Cms\Page && !$model->isHomeOrErrorPage()) {
-                                $model->changeSlug($model->uid(), $target);
+                            foreach (['changes', 'latest'] as $id) {
+                                $version = $model->version($id);
+                                if ($version->exists($language)) $version->delete($language);
                             }
 
                             return [
                                 'event'   => 'model.update',
-                                'message' => t('translatewizard.reset.done', 'Content reset.'),
+                                'message' => t('translatewizard.delete.done', 'Translation deleted.'),
                             ];
-                        }
+                        },
                     ],
                     // from the original language into one language (or all):
                     // asked first with the characters it costs

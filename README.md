@@ -28,14 +28,16 @@ translated title. Once a language has its own slug it is never changed
 again, so published URLs stay stable (home and error page keep their
 slug; on a slug collision the current slug is kept).
 
-Adds its own **Translation** button to page views in every secondary
-language with two actions:
+Adds its own **Translation** button to page views:
 
-- **Translate page with AI** — sends the default-language content through DeepL
-  and writes the result to the current secondary language.
-- **Restore original language** — copies the default-language content
-  onto the current language 1:1 and drops the translated slug
-  (destructive). Disabled until the language's content file exists.
+- In the **original language**: *Translate into: …* for each secondary
+  language that has no translation yet (a language with one is greyed
+  out), and *Translate all missing languages* when there are several.
+- In a **secondary language**: *Translate page* while it has no
+  translation, *Delete translation* once it has one – the page then shows
+  the original language again (the translated slug goes with it).
+
+Each translation asks first, with the characters it sends to DeepL.
 
 ## Requirements
 
