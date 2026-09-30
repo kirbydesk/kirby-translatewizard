@@ -199,9 +199,15 @@ Kirby::plugin('kirbydesk/translatewizard', [
                                 throw new InvalidArgumentException(message: 'The original language cannot be deleted.');
                             }
 
-                            foreach (['changes', 'latest'] as $id) {
-                                $version = $model->version($id);
-                                if ($version->exists($language)) $version->delete($language);
+                            // the page's translation and that of its own files (their
+                            // texts were translated with it); files of other pages
+                            // it only uses stay
+                            $models = [$model, ...($model->files()->values())];
+                            foreach ($models as $item) {
+                                foreach (['changes', 'latest'] as $id) {
+                                    $version = $item->version($id);
+                                    if ($version->exists($language)) $version->delete($language);
+                                }
                             }
 
                             return [

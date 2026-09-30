@@ -56,7 +56,8 @@ The plugin brings its own view button `translatewizard`:
   *Translate missing languages* when there are several.
 - In a **secondary language**: *Translate page* while it has no
   translation, *Delete translation* once it has one – the page then shows
-  the original language again (the translated slug goes with it).
+  the original language again (the translated slug and the translated
+  texts of its own files go with it).
 
 Each translation asks first, with the characters it sends to DeepL.
 kirby-contentwizard brings its own button (`contentwizard`).
