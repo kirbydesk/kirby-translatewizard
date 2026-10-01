@@ -24,7 +24,7 @@ spl_autoload_register(function (string $class): void {
  */
 function _translatewizard_apiKey(App $kirby): ?string
 {
-    $key = $kirby->option('kirbydesk.translatewizard.deepl.apiKey')
+    $key = $kirby->option('kirbydesk.kirby-translatewizard.deepl.apiKey')
         ?: (class_exists('pwSecrets') ? pwSecrets::get('DEEPL_API_KEY') : '')
         ?: getenv('DEEPL_API_KEY');
     return is_string($key) && $key !== '' ? $key : null;
@@ -127,7 +127,7 @@ function _translatewizard_chars($model, string $source): int
     return array_sum(array_map(fn ($t) => mb_strlen(strip_tags((string) $t)), $translator->sent));
 }
 
-Kirby::plugin('kirbydesk/translatewizard', [
+Kirby::plugin('kirbydesk/kirby-translatewizard', [
     'options' => [
         'deepl.apiKey' => null,
 
@@ -295,7 +295,7 @@ Kirby::plugin('kirbydesk/translatewizard', [
 
                             $apiKey = _translatewizard_apiKey($kirby);
                             if ($apiKey === null) {
-                                throw new InvalidArgumentException(message: 'No DeepL API key configured (kirbydesk.translatewizard.deepl.apiKey).');
+                                throw new InvalidArgumentException(message: 'No DeepL API key configured (kirbydesk.kirby-translatewizard.deepl.apiKey).');
                             }
 
                             $body   = $kirby->request()->body()->toArray();

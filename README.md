@@ -105,7 +105,7 @@ and never shown again in full. Alternatively set it in
 
 ```php
 return [
-    'kirbydesk.translatewizard' => [
+    'kirbydesk.kirby-translatewizard' => [
         'deepl' => [
             'apiKey' => 'YOUR-DEEPL-API-KEY',
         ],
